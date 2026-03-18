@@ -1,0 +1,55 @@
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+"""
+body = """
+{% if version -%}
+## {{ version | trim_start_matches(pat="v") }} - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+
+{% for group, commits in commits | group_by(attribute="group") -%}
+### {{ group }}
+{% for commit in commits -%}
+- {{ commit.message | split(pat="\n") | first | trim }}{% if commit.breaking %} **[BREAKING]**{% endif %}
+{% endfor -%}
+
+{% endfor -%}
+{% if version and previous.version -%}
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/{{ previous.version }}...{{ version }}
+{% endif -%}
+"""
+trim = true
+
+[git]
+conventional_commits = false
+commit_parsers = [
+    { message = "^[Ff]eat(?:\\(.*\\))?:?\\s", group = "✨ Features" },
+    { message = "^[Ff]ix(?:\\(.*\\))?:?\\s", group = "🐛 Bug Fixes" },
+    { message = "^[Dd]ocs(?:\\(.*\\))?:?\\s", group = "📚 Documentation" },
+    { message = "^[Pp]erf(?:\\(.*\\))?:?\\s", group = "⚡ Performance" },
+    { message = "^[Rr]efactor(?:\\(.*\\))?:?\\s", group = "♻️ Refactor" },
+    { message = "^[Ss]tyle(?:\\(.*\\))?:?\\s", group = "💄 Styling" },
+    { message = "^[Tt]est(?:\\(.*\\))?:?\\s", group = "🧪 Testing" },
+    { message = "^[Cc]hore(?:\\(.*\\))?:?\\s", group = "🔧 Chores" },
+    { message = "^[Bb]uild(?:\\(.*\\))?:?\\s", group = "📦 Build" },
+    { message = "^[Cc]i(?:\\(.*\\))?:?\\s", group = "🔄 CI" },
+    { message = "^[Aa]dd(?:\\(.*\\))?:?\\s", group = "➕ Added" },
+    { message = "^[Uu]pdate(?:\\(.*\\))?:?\\s", group = "🔄 Updated" },
+    { message = ".*", group = "📦 Other Changes" },
+]
+filter_commits = false
+tag_pattern = "v[0-9]*"
+sort_tags = true
+protect_breaking_commits = true
+
+[github]
+add_links = true
+owner = "sorinirimies"
+repo = "tui-spinner"
+issues = true
+pull_requests = true

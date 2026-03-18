@@ -1,0 +1,35 @@
+[package]
+name = "tui-spinner"
+version = "0.1.0"
+authors = ["Sorin Albu-Irimies <sorinirimies@gmail.com>"]
+edition = "2021"
+rust-version = "1.74.0"
+license = "MIT"
+description = "Customizable spinner widgets for Ratatui TUI applications — Zed-style dots, ellipsis, and braille arc spinners"
+repository = "https://github.com/sorinirimies/tui-spinner"
+homepage = "https://github.com/sorinirimies/tui-spinner"
+keywords = ["tui", "terminal", "ratatui", "spinner", "widget"]
+categories = ["command-line-interface", "visualization", "rendering", "gui", "graphics"]
+readme = "README.md"
+exclude = [
+    ".gitea/",
+    ".github/",
+    "GITEA_SETUP.md",
+    "cliff.toml",
+]
+
+[dependencies]
+ratatui = { version = "0.30", default-features = false }
+
+[dev-dependencies]
+color-eyre = "0.6"
+ratatui = { version = "0.30", features = ["crossterm"] }
+crossterm = "0.29"
+
+[lib]
+name = "tui_spinner"
+path = "src/lib.rs"
+
+[[example]]
+name = "spinner"
+path = "examples/spinner.rs"
