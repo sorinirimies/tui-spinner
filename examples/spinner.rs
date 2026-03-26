@@ -4,7 +4,7 @@
 //!
 //! - **Col 1** — [`RectSpinner`] `Square`, filled centre, clockwise
 //! - **Col 2** — [`RectSpinner`] `Square`, empty centre, counter-clockwise
-//! - **Col 3** — [`RectSpinner`] `Narrow` — 1-char-wide Zed sidebar style
+
 //! - **Col 4** — [`CircleSpinner`] — various radii, CW and CCW
 //! - **Col 5** — [`LinearSpinner`] vertical and horizontal
 //!
@@ -24,8 +24,7 @@ use ratatui::{
 };
 use std::time::{Duration, Instant};
 use tui_spinner::{
-    Centre, CircleSpinner, Direction, LinearSpinner, LinearStyle, RectShape, RectSpinner,
-    RectStyle, Spin,
+    Centre, CircleSpinner, Direction, LinearSpinner, LinearStyle, RectShape, RectSpinner, Spin,
 };
 
 // ── App state ─────────────────────────────────────────────────────────────────
@@ -102,7 +101,7 @@ fn render_header(frame: &mut Frame, area: Rect) {
         .padding(Padding::horizontal(1));
 
     let text = Paragraph::new(
-        "Square · Filled · CW  ·  Square · Empty · CCW  ·  Narrow  ·  Circle  ·  LinearSpinner",
+        "Square · Filled · CW  ·  Square · Empty · CCW  ·  Circle  ·  LinearSpinner",
     )
     .alignment(Alignment::Center)
     .style(Style::default().fg(Color::Gray));
@@ -142,42 +141,27 @@ fn render_footer(frame: &mut Frame, area: Rect) {
 }
 
 fn render_content(frame: &mut Frame, area: Rect, tick: u64) {
-    let [col_filled, col_empty, col_narrow, col_circle, col_linear] = Layout::horizontal([
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
+    let [col_filled, col_empty, col_circle, col_linear] = Layout::horizontal([
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
     ])
     .areas(area);
 
     render_square_filled_column(frame, col_filled, tick);
     render_square_empty_column(frame, col_empty, tick);
-    render_narrow_column(frame, col_narrow, tick);
     render_circle_column(frame, col_circle, tick);
     render_linear_column(frame, col_linear, tick);
 }
 
 // ── Style table ───────────────────────────────────────────────────────────────
 
-const RECT_STYLES: &[(RectStyle, Color, &str)] = &[
-    (RectStyle::Arc, Color::Cyan, "Arc"),
-    (RectStyle::Dense, Color::Magenta, "Dense"),
-    (RectStyle::Shade, Color::Green, "Shade"),
-    (RectStyle::Outline, Color::Yellow, "Outline"),
-    (RectStyle::Dot, Color::White, "Dot"),
-    (RectStyle::Star, Color::LightYellow, "Star"),
-    (RectStyle::Diamond, Color::LightMagenta, "Diamond"),
-    (RectStyle::Cross, Color::LightCyan, "Cross"),
-    (RectStyle::Fade, Color::LightGreen, "Fade"),
-    (RectStyle::Pixel, Color::LightRed, "Pixel"),
-];
-
 // ── Col 1 — Square, Filled centre ─────────────────────────────────────────────
 
 fn render_square_filled_column(frame: &mut Frame, area: Rect, tick: u64) {
     let outer_block = Block::bordered()
-        .title(" Square · Filled · ↻ ")
+        .title(" Square · Filled · CW ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Cyan))
@@ -186,205 +170,120 @@ fn render_square_filled_column(frame: &mut Frame, area: Rect, tick: u64) {
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
 
-    let n = RECT_STYLES.len() as u16;
-    let row_h = ((inner.height.saturating_sub(1)) / n).max(1);
-
-    let mut constraints = vec![Constraint::Length(1)];
-    for _ in RECT_STYLES {
-        constraints.push(Constraint::Length(row_h));
-    }
-    constraints.push(Constraint::Min(0));
-    let rows = Layout::vertical(constraints).split(inner);
+    let rows = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(8),
+        Constraint::Length(8),
+        Constraint::Min(0),
+    ])
+    .split(inner);
 
     frame.render_widget(
         Paragraph::new(Span::styled(
-            "size 2  size 3",
+            "size 2     size 3",
             Style::default().fg(Color::DarkGray),
         ))
         .alignment(Alignment::Center),
         rows[0],
     );
 
-    for (i, &(style, color, label)) in RECT_STYLES.iter().enumerate() {
-        let row = rows[i + 1];
-        let [s2, s3, lbl] = Layout::horizontal([
-            Constraint::Length(5),
-            Constraint::Length(6),
-            Constraint::Min(0),
-        ])
-        .areas(row);
+    frame.render_widget(
+        RectSpinner::new(tick)
+            .shape(RectShape::Square(2))
+            .spin(Spin::Clockwise)
+            .outer_color(Color::Cyan)
+            .inner_color(Color::DarkGray)
+            .centre(Centre::Filled)
+            .ticks_per_step(3)
+            .alignment(Alignment::Center),
+        rows[1],
+    );
 
-        frame.render_widget(
-            RectSpinner::new(tick)
-                .shape(RectShape::Square(2))
-                .render_style(style)
-                .spin(Spin::Clockwise)
-                .outer_color(color)
-                .inner_color(Color::DarkGray)
-                .centre(Centre::Filled)
-                .ticks_per_step(3)
-                .alignment(Alignment::Center),
-            s2,
-        );
-        frame.render_widget(
-            RectSpinner::new(tick)
-                .shape(RectShape::Square(3))
-                .render_style(style)
-                .spin(Spin::Clockwise)
-                .outer_color(color)
-                .inner_color(Color::DarkGray)
-                .centre(Centre::Filled)
-                .ticks_per_step(5)
-                .alignment(Alignment::Center),
-            s3,
-        );
-        frame.render_widget(
-            Paragraph::new(Span::styled(
-                format!(" {label}"),
-                Style::default().fg(color),
-            )),
-            lbl,
-        );
-    }
+    frame.render_widget(
+        RectSpinner::new(tick)
+            .shape(RectShape::Square(3))
+            .spin(Spin::Clockwise)
+            .outer_color(Color::Cyan)
+            .inner_color(Color::DarkGray)
+            .centre(Centre::Filled)
+            .ticks_per_step(5)
+            .alignment(Alignment::Center),
+        rows[1],
+    );
+
+    frame.render_widget(
+        Paragraph::new(Span::styled(
+            "Braille (Filled Center)",
+            Style::default().fg(Color::DarkGray),
+        ))
+        .alignment(Alignment::Center),
+        rows[2],
+    );
 }
 
 // ── Col 2 — Square, Empty centre ──────────────────────────────────────────────
 
 fn render_square_empty_column(frame: &mut Frame, area: Rect, tick: u64) {
     let outer_block = Block::bordered()
-        .title(" Square · Empty · ↺ ")
+        .title(" Square · Empty · CCW ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::LightMagenta))
+        .border_style(Style::default().fg(Color::Green))
         .padding(Padding::uniform(1));
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
 
-    let n = RECT_STYLES.len() as u16;
-    let row_h = ((inner.height.saturating_sub(1)) / n).max(1);
-
-    let mut constraints = vec![Constraint::Length(1)];
-    for _ in RECT_STYLES {
-        constraints.push(Constraint::Length(row_h));
-    }
-    constraints.push(Constraint::Min(0));
-    let rows = Layout::vertical(constraints).split(inner);
+    let rows = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(8),
+        Constraint::Length(8),
+        Constraint::Min(0),
+    ])
+    .split(inner);
 
     frame.render_widget(
         Paragraph::new(Span::styled(
-            "size 2  size 3",
+            "size 2     size 3",
             Style::default().fg(Color::DarkGray),
         ))
         .alignment(Alignment::Center),
         rows[0],
     );
 
-    for (i, &(style, color, label)) in RECT_STYLES.iter().enumerate() {
-        let row = rows[i + 1];
-        let [s2, s3, lbl] = Layout::horizontal([
-            Constraint::Length(5),
-            Constraint::Length(6),
-            Constraint::Min(0),
-        ])
-        .areas(row);
+    frame.render_widget(
+        RectSpinner::new(tick)
+            .shape(RectShape::Square(2))
+            .spin(Spin::CounterClockwise)
+            .outer_color(Color::Green)
+            .centre(Centre::Empty)
+            .ticks_per_step(3)
+            .alignment(Alignment::Center),
+        rows[1],
+    );
 
-        frame.render_widget(
-            RectSpinner::new(tick)
-                .shape(RectShape::Square(2))
-                .render_style(style)
-                .spin(Spin::CounterClockwise)
-                .outer_color(color)
-                .centre(Centre::Empty)
-                .ticks_per_step(3)
-                .alignment(Alignment::Center),
-            s2,
-        );
-        frame.render_widget(
-            RectSpinner::new(tick)
-                .shape(RectShape::Square(3))
-                .render_style(style)
-                .spin(Spin::CounterClockwise)
-                .outer_color(color)
-                .centre(Centre::Empty)
-                .ticks_per_step(5)
-                .alignment(Alignment::Center),
-            s3,
-        );
-        frame.render_widget(
-            Paragraph::new(Span::styled(
-                format!(" {label}"),
-                Style::default().fg(color),
-            )),
-            lbl,
-        );
-    }
+    frame.render_widget(
+        RectSpinner::new(tick)
+            .shape(RectShape::Square(3))
+            .spin(Spin::CounterClockwise)
+            .outer_color(Color::Green)
+            .centre(Centre::Empty)
+            .ticks_per_step(5)
+            .alignment(Alignment::Center),
+        rows[1],
+    );
+
+    frame.render_widget(
+        Paragraph::new(Span::styled(
+            "Braille (Empty Center)",
+            Style::default().fg(Color::DarkGray),
+        ))
+        .alignment(Alignment::Center),
+        rows[2],
+    );
 }
 
-// ── Col 3 — Narrow (1-char-wide Zed-style sidebar) ───────────────────────────
-//
-// Each row shows one Narrow spinner (1 char wide) in a different colour,
-// all at the same arc speed.  The Narrow spinner ignores render_style and
-// centre — it always renders the 10-frame Zed braille cap animation.
-
-const NARROW_COLORS: &[(Color, &str)] = &[
-    (Color::Cyan, "Cyan"),
-    (Color::Magenta, "Magenta"),
-    (Color::Green, "Green"),
-    (Color::Yellow, "Yellow"),
-    (Color::White, "White"),
-    (Color::LightYellow, "Lt.Yellow"),
-    (Color::LightMagenta, "Lt.Magenta"),
-    (Color::LightCyan, "Lt.Cyan"),
-    (Color::LightGreen, "Lt.Green"),
-    (Color::LightRed, "Lt.Red"),
-];
-
-fn render_narrow_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" Narrow · Zed ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::LightGreen))
-        .padding(Padding::uniform(1));
-
-    let inner = outer_block.inner(area);
-    frame.render_widget(outer_block, area);
-
-    let n = NARROW_COLORS.len();
-    let row_h = (inner.height / n as u16).max(1);
-
-    let mut constraints: Vec<Constraint> = (0..n).map(|_| Constraint::Length(row_h)).collect();
-    constraints.push(Constraint::Min(0));
-    let rows = Layout::vertical(constraints).split(inner);
-
-    for (i, &(color, label)) in NARROW_COLORS.iter().enumerate() {
-        let row = rows[i];
-        let h = row_h.max(3) as usize;
-
-        // Spinner occupies 1 char column; label gets the rest.
-        let [spinner_area, lbl_area] =
-            Layout::horizontal([Constraint::Length(1), Constraint::Min(0)]).areas(row);
-
-        frame.render_widget(
-            RectSpinner::new(tick)
-                .shape(RectShape::Narrow(h))
-                .outer_color(color)
-                .inner_color(Color::DarkGray)
-                .ticks_per_step(2),
-            spinner_area,
-        );
-        frame.render_widget(
-            Paragraph::new(Span::styled(
-                format!(" {label}"),
-                Style::default().fg(color),
-            )),
-            lbl_area,
-        );
-    }
-}
-
-// ── Col 4 — CircleSpinner ─────────────────────────────────────────────────────
+// ── Col 3 — Circle ────────────────────────────────────────────────────────────
 
 fn render_circle_column(frame: &mut Frame, area: Rect, tick: u64) {
     let outer_block = Block::bordered()

@@ -135,5 +135,5 @@ mod square_spinner;
 
 pub use circle_spinner::CircleSpinner;
 pub use linear_spinner::{Direction, LinearSpinner, LinearStyle};
-pub use rect_spinner::{Centre, RectShape, RectSpinner, RectStyle, Spin};
-pub use square_spinner::{SquareSpinner, SquareStyle};
+pub use rect_spinner::{Centre, RectShape, RectSpinner, Spin};
+pub use square_spinner::SquareSpinner;

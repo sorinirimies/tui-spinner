@@ -4,27 +4,27 @@
 //! to keep the original public API compiling without changes.
 
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Alignment, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Style, Styled};
 use ratatui::widgets::{Block, Widget};
 
-pub use crate::rect_spinner::RectStyle as SquareStyle;
-use crate::rect_spinner::{Centre, RectShape, RectSpinner};
+use crate::rect_spinner::{Centre, RectShape, RectSpinner, Spin};
 
-/// A rotating braille-arc spinner — legacy alias for [`RectSpinner`].
+/// A simple square braille-arc spinner — legacy alias for [`RectSpinner`].
 ///
-/// Identical in behaviour to `RectSpinner::new(tick).shape(RectShape::Square(size))`.
-/// Prefer [`RectSpinner`] for new code.
+/// Renders a rotating arc around a square perimeter in braille characters.
+/// Supports filled or empty center modes and clockwise/counter-clockwise directions.
 ///
 /// # Examples
 ///
 /// ```no_run
 /// use ratatui::style::Color;
-/// use tui_spinner::{SquareSpinner, SquareStyle};
+/// use tui_spinner::{Centre, SquareSpinner, Spin};
 ///
 /// let spinner = SquareSpinner::new(42)
 ///     .size(2)
-///     .render_style(SquareStyle::Dense)
+///     .centre(Centre::Filled)
+///     .spin(Spin::Clockwise)
 ///     .outer_color(Color::Cyan)
 ///     .inner_color(Color::DarkGray);
 /// ```
@@ -63,21 +63,6 @@ impl<'a> SquareSpinner<'a> {
     pub fn size(mut self, size: usize) -> Self {
         let size = size.clamp(2, 8);
         self.inner = self.inner.shape(RectShape::Square(size));
-        self
-    }
-
-    /// Sets the rendering style for arc cells (default: [`SquareStyle::Arc`]).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tui_spinner::{SquareSpinner, SquareStyle};
-    ///
-    /// let spinner = SquareSpinner::new(0).render_style(SquareStyle::Star);
-    /// ```
-    #[must_use]
-    pub fn render_style(mut self, style: SquareStyle) -> Self {
-        self.inner = self.inner.render_style(style);
         self
     }
 
@@ -128,6 +113,21 @@ impl<'a> SquareSpinner<'a> {
         self
     }
 
+    /// Sets the rotation direction (default: `Clockwise`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::{SquareSpinner, Spin};
+    ///
+    /// let ccw = SquareSpinner::new(0).spin(Spin::CounterClockwise);
+    /// ```
+    #[must_use]
+    pub fn spin(mut self, spin: Spin) -> Self {
+        self.inner = self.inner.spin(spin);
+        self
+    }
+
     /// Sets how many ticks the arc holds each position before advancing
     /// (default: 1, higher = slower).
     #[must_use]
@@ -156,13 +156,6 @@ impl<'a> SquareSpinner<'a> {
     #[must_use]
     pub fn style<S: Into<Style>>(mut self, style: S) -> Self {
         self.inner = self.inner.style(style);
-        self
-    }
-
-    /// Sets the horizontal alignment of the output (default: left).
-    #[must_use]
-    pub fn alignment(mut self, alignment: Alignment) -> Self {
-        self.inner = self.inner.alignment(alignment);
         self
     }
 }
