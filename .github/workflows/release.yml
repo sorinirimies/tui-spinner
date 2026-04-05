@@ -1,0 +1,172 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Release — tui-spinner
+#  Triggered on version tags (v*) and manual dispatch.
+#  Pure-Rust library crate — no binary builds needed.
+#
+#  Jobs:
+#    1. validate — resolve and validate the tag (vX.Y.Z)
+#    2. test     — quality gate (fmt, clippy, tests)
+#    3. release  — generate changelog & create GitHub Release
+#    4. publish  — publish the crate to crates.io
+# ─────────────────────────────────────────────────────────────────────
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.2.0). Leave empty to use the latest v* tag."
+        required: false
+        type: string
+
+# Only one release pipeline at a time.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── 1. Validate tag ──────────────────────────────────────────────
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: resolve
+        run: |
+          # Prefer explicit input, then GITHUB_REF, then latest v* tag.
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="$(git tag --list 'v*' --sort=-v:refname | head -n1)"
+          fi
+
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag found. Push a v* tag or provide one via workflow_dispatch."
+            exit 1
+          fi
+
+          # Validate vX.Y.Z format.
+          if ! echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Tag '$TAG' does not match vX.Y.Z format."
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          echo "tag=$TAG"       >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "✅ Releasing $TAG (version $VERSION)"
+
+  # ── 2. Quality gate ──────────────────────────────────────────────
+  test:
+    name: Quality gate
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-features -- -D warnings
+
+      - name: Tests
+        run: cargo test --all-features
+
+  # ── 3. Create GitHub Release ─────────────────────────────────────
+  release:
+    name: GitHub Release
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.validate.outputs.tag }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        run: |
+          cargo install git-cliff --locked
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install nushell
+        run: |
+          cargo install nu --locked
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Generate release notes & changelog
+        run: nu scripts/release_prepare.nu "${{ env.TAG }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            LICENSE
+            README.md
+            CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 4. Publish to crates.io ──────────────────────────────────────
+  publish:
+    name: Publish to crates.io
+    needs: [validate, release]
+    runs-on: ubuntu-latest
+    # Only run when the CRATES_IO_TOKEN secret is available.
+    if: ${{ secrets.CRATES_IO_TOKEN != '' }}
+    env:
+      TAG: ${{ needs.validate.outputs.tag }}
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Publish
+        run: |
+          echo "Publishing tui-spinner ${{ env.VERSION }} to crates.io..."
+          cargo publish --token "${{ secrets.CRATES_IO_TOKEN }}" || {
+            EXIT_CODE=$?
+            # Gracefully handle "already exists" (exit code 101 with the
+            # specific message). Any other failure is a real error.
+            if cargo publish --token "${{ secrets.CRATES_IO_TOKEN }}" 2>&1 | grep -q "already uploaded"; then
+              echo "⚠️  Version ${{ env.VERSION }} is already published — skipping."
+              exit 0
+            fi
+            exit $EXIT_CODE
+          }
+          echo "✅ Published tui-spinner ${{ env.VERSION }}"

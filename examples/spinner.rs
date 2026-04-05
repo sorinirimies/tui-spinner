@@ -1,12 +1,11 @@
 //! # Spinner Widget Example
 //!
-//! Demonstrates all spinner widgets and style variants side-by-side:
+//! Demonstrates all spinner widgets side-by-side:
 //!
-//! - **Col 1** — [`RectSpinner`] `Square`, filled centre, clockwise
-//! - **Col 2** — [`RectSpinner`] `Square`, empty centre, counter-clockwise
-
-//! - **Col 4** — [`CircleSpinner`] — various radii, CW and CCW
-//! - **Col 5** — [`LinearSpinner`] vertical and horizontal
+//! - **Col 1** — [`SquareSpinner`] filled centre, clockwise
+//! - **Col 2** — [`SquareSpinner`] empty centre, counter-clockwise
+//! - **Col 3** — [`CircleSpinner`] — various radii, CW and CCW
+//! - **Col 4** — [`LinearSpinner`] vertical and horizontal
 //!
 //! **Controls:**
 //! - `q` / `Esc` — Quit
@@ -24,7 +23,7 @@ use ratatui::{
 };
 use std::time::{Duration, Instant};
 use tui_spinner::{
-    Centre, CircleSpinner, Direction, LinearSpinner, LinearStyle, RectShape, RectSpinner, Spin,
+    Centre, CircleSpinner, Direction, LinearSpinner, LinearStyle, Spin, SquareSpinner,
 };
 
 // ── App state ─────────────────────────────────────────────────────────────────
@@ -155,8 +154,6 @@ fn render_content(frame: &mut Frame, area: Rect, tick: u64) {
     render_linear_column(frame, col_linear, tick);
 }
 
-// ── Style table ───────────────────────────────────────────────────────────────
-
 // ── Col 1 — Square, Filled centre ─────────────────────────────────────────────
 
 fn render_square_filled_column(frame: &mut Frame, area: Rect, tick: u64) {
@@ -170,55 +167,37 @@ fn render_square_filled_column(frame: &mut Frame, area: Rect, tick: u64) {
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
 
-    let rows = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Length(8),
-        Constraint::Length(8),
-        Constraint::Min(0),
-    ])
-    .split(inner);
+    let rows = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(inner);
 
     frame.render_widget(
         Paragraph::new(Span::styled(
-            "size 2     size 3",
+            "size 2      size 3      size 4",
             Style::default().fg(Color::DarkGray),
         ))
         .alignment(Alignment::Center),
         rows[0],
     );
 
-    frame.render_widget(
-        RectSpinner::new(tick)
-            .shape(RectShape::Square(2))
-            .spin(Spin::Clockwise)
-            .outer_color(Color::Cyan)
-            .inner_color(Color::DarkGray)
-            .centre(Centre::Filled)
-            .ticks_per_step(3)
-            .alignment(Alignment::Center),
-        rows[1],
-    );
+    let cols = Layout::horizontal([
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+    ])
+    .split(rows[1]);
 
-    frame.render_widget(
-        RectSpinner::new(tick)
-            .shape(RectShape::Square(3))
-            .spin(Spin::Clockwise)
-            .outer_color(Color::Cyan)
-            .inner_color(Color::DarkGray)
-            .centre(Centre::Filled)
-            .ticks_per_step(5)
-            .alignment(Alignment::Center),
-        rows[1],
-    );
-
-    frame.render_widget(
-        Paragraph::new(Span::styled(
-            "Braille (Filled Center)",
-            Style::default().fg(Color::DarkGray),
-        ))
-        .alignment(Alignment::Center),
-        rows[2],
-    );
+    for (i, sz) in [2, 3, 4].iter().enumerate() {
+        frame.render_widget(
+            SquareSpinner::new(tick)
+                .size(*sz)
+                .spin(Spin::Clockwise)
+                .arc_color(Color::Cyan)
+                .dim_color(Color::DarkGray)
+                .centre(Centre::Filled)
+                .ticks_per_step(2 + *sz as u64)
+                .alignment(Alignment::Center),
+            cols[i],
+        );
+    }
 }
 
 // ── Col 2 — Square, Empty centre ──────────────────────────────────────────────
@@ -234,53 +213,36 @@ fn render_square_empty_column(frame: &mut Frame, area: Rect, tick: u64) {
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
 
-    let rows = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Length(8),
-        Constraint::Length(8),
-        Constraint::Min(0),
-    ])
-    .split(inner);
+    let rows = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(inner);
 
     frame.render_widget(
         Paragraph::new(Span::styled(
-            "size 2     size 3",
+            "size 2      size 3      size 4",
             Style::default().fg(Color::DarkGray),
         ))
         .alignment(Alignment::Center),
         rows[0],
     );
 
-    frame.render_widget(
-        RectSpinner::new(tick)
-            .shape(RectShape::Square(2))
-            .spin(Spin::CounterClockwise)
-            .outer_color(Color::Green)
-            .centre(Centre::Empty)
-            .ticks_per_step(3)
-            .alignment(Alignment::Center),
-        rows[1],
-    );
+    let cols = Layout::horizontal([
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+    ])
+    .split(rows[1]);
 
-    frame.render_widget(
-        RectSpinner::new(tick)
-            .shape(RectShape::Square(3))
-            .spin(Spin::CounterClockwise)
-            .outer_color(Color::Green)
-            .centre(Centre::Empty)
-            .ticks_per_step(5)
-            .alignment(Alignment::Center),
-        rows[1],
-    );
-
-    frame.render_widget(
-        Paragraph::new(Span::styled(
-            "Braille (Empty Center)",
-            Style::default().fg(Color::DarkGray),
-        ))
-        .alignment(Alignment::Center),
-        rows[2],
-    );
+    for (i, sz) in [2, 3, 4].iter().enumerate() {
+        frame.render_widget(
+            SquareSpinner::new(tick)
+                .size(*sz)
+                .spin(Spin::CounterClockwise)
+                .arc_color(Color::Green)
+                .centre(Centre::Empty)
+                .ticks_per_step(2 + *sz as u64)
+                .alignment(Alignment::Center),
+            cols[i],
+        );
+    }
 }
 
 // ── Col 3 — Circle ────────────────────────────────────────────────────────────

@@ -46,6 +46,38 @@ pub enum Direction {
     Vertical,
 }
 
+// ── Flow ──────────────────────────────────────────────────────────────────────
+
+/// The animation flow direction of a [`LinearSpinner`].
+///
+/// Controls whether the animation plays forwards (the default) or backwards.
+///
+/// - [`Flow::Forwards`] — horizontal scrolls left-to-right; vertical bounces
+///   starting upward (index 0 → n-1 → 0 …).
+/// - [`Flow::Backwards`] — horizontal scrolls right-to-left; vertical bounces
+///   starting downward (index n-1 → 0 → n-1 …).
+///
+/// # Examples
+///
+/// ```
+/// use tui_spinner::{LinearSpinner, Flow};
+///
+/// let backwards = LinearSpinner::new(0).flow(Flow::Backwards);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Flow {
+    /// Normal playback direction (default).
+    ///
+    /// Horizontal scrolls left-to-right; vertical bounces starting from the top.
+    #[default]
+    Forwards,
+
+    /// Reversed playback direction.
+    ///
+    /// Horizontal scrolls right-to-left; vertical bounces starting from the bottom.
+    Backwards,
+}
+
 // ── LinearStyle ──────────────────────────────────────────────────────────────────
 
 /// The symbol pair used to draw active and inactive slot positions.
@@ -204,6 +236,8 @@ pub struct LinearSpinner<'a> {
     ticks_per_step: u64,
     /// Animation direction and layout axis.
     direction: Direction,
+    /// Animation flow (forwards or backwards).
+    flow: Flow,
     /// Symbol set.
     linear_style: LinearStyle,
     /// Colour of lit / active symbols.
@@ -235,6 +269,7 @@ impl<'a> LinearSpinner<'a> {
             lit_slots: 2,
             ticks_per_step: 3,
             direction: Direction::Horizontal,
+            flow: Flow::Forwards,
             linear_style: LinearStyle::Classic,
             active_color: Color::White,
             inactive_color: Color::DarkGray,
@@ -258,6 +293,24 @@ impl<'a> LinearSpinner<'a> {
     #[must_use]
     pub const fn direction(mut self, direction: Direction) -> Self {
         self.direction = direction;
+        self
+    }
+
+    /// Sets the animation flow direction (default: [`Flow::Forwards`]).
+    ///
+    /// - [`Flow::Forwards`]  — normal playback (left-to-right / upward-first bounce).
+    /// - [`Flow::Backwards`] — reversed playback (right-to-left / downward-first bounce).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::{Flow, LinearSpinner};
+    ///
+    /// let backwards = LinearSpinner::new(0).flow(Flow::Backwards);
+    /// ```
+    #[must_use]
+    pub const fn flow(mut self, flow: Flow) -> Self {
+        self.flow = flow;
         self
     }
 
@@ -416,7 +469,14 @@ impl<'a> LinearSpinner<'a> {
     fn build_horizontal_line(&self) -> Line<'static> {
         let total = self.total_slots.max(1);
         let lit = self.lit_slots.min(total);
-        let step = self.step() % total;
+        let raw_step = self.step() % total;
+
+        // In backwards mode the step index runs in reverse so the window
+        // scrolls right-to-left instead of left-to-right.
+        let step = match self.flow {
+            Flow::Forwards => raw_step,
+            Flow::Backwards => (total - 1) - raw_step,
+        };
 
         let spans: Vec<Span<'static>> = (0..total)
             .map(|i| {
@@ -437,7 +497,9 @@ impl<'a> LinearSpinner<'a> {
 
     /// The bounce sequence maps a step index to a slot index.
     ///
-    /// For `total_slots = n` the sequence is `0, 1, …, n-1, n-2, …, 1` (ping-pong).
+    /// For `total_slots = n` the forwards sequence is `0, 1, …, n-1, n-2, …, 1`
+    /// (ping-pong starting from the top).  [`Flow::Backwards`] mirrors this to
+    /// `n-1, n-2, …, 0, 1, …, n-2` (starting from the bottom).
     fn bounce_index(&self) -> usize {
         let n = self.total_slots.max(1);
         if n == 1 {
@@ -446,10 +508,12 @@ impl<'a> LinearSpinner<'a> {
         // Full cycle length = 2*(n-1)
         let cycle = 2 * (n - 1);
         let pos = self.step() % cycle;
-        if pos < n {
-            pos
-        } else {
-            cycle - pos
+        let idx = if pos < n { pos } else { cycle - pos };
+
+        match self.flow {
+            Flow::Forwards => idx,
+            // Mirror: 0 ↔ n-1, 1 ↔ n-2, …
+            Flow::Backwards => (n - 1) - idx,
         }
     }
 
@@ -534,6 +598,7 @@ impl Widget for &LinearSpinner<'_> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::needless_range_loop)]
     use super::*;
 
     // ── Horizontal ────────────────────────────────────────────────────────────
@@ -605,6 +670,79 @@ mod tests {
                 .total_slots(1);
             assert_eq!(s.bounce_index(), 0);
         }
+    }
+
+    // ── Flow::Backwards — horizontal ──────────────────────────────────────────
+
+    #[test]
+    fn horizontal_backwards_first_step_lights_last_two() {
+        // Flow::Backwards with step=0 → reversed step = total-1 = 2, lit=2
+        // so the window starts at index 2 and wraps: slots 2 and 0 are lit.
+        let s = LinearSpinner::new(0).flow(Flow::Backwards);
+        let line = s.build_horizontal_line();
+        let content: Vec<&str> = line.spans.iter().map(|sp| sp.content.as_ref()).collect();
+        let (on, off) = LinearStyle::Classic.symbols(Direction::Horizontal);
+        assert_eq!(content, &[on, off, on]);
+    }
+
+    #[test]
+    fn horizontal_backwards_second_step_reverses() {
+        // Flow::Backwards, tick=3 → raw step=1 → reversed step = 2-1 = 1, lit=2
+        // window at 1: slots 1,2 lit.
+        let s = LinearSpinner::new(3).flow(Flow::Backwards);
+        let line = s.build_horizontal_line();
+        let content: Vec<&str> = line.spans.iter().map(|sp| sp.content.as_ref()).collect();
+        let (on, off) = LinearStyle::Classic.symbols(Direction::Horizontal);
+        assert_eq!(content, &[off, on, on]);
+    }
+
+    #[test]
+    fn horizontal_backwards_third_step() {
+        // Flow::Backwards, tick=6 → raw step=2 → reversed step = 2-2 = 0, lit=2
+        // window at 0: slots 0,1 lit.
+        let s = LinearSpinner::new(6).flow(Flow::Backwards);
+        let line = s.build_horizontal_line();
+        let content: Vec<&str> = line.spans.iter().map(|sp| sp.content.as_ref()).collect();
+        let (on, off) = LinearStyle::Classic.symbols(Direction::Horizontal);
+        assert_eq!(content, &[on, on, off]);
+    }
+
+    // ── Flow::Backwards — vertical / bounce ───────────────────────────────────
+
+    #[test]
+    fn vertical_backwards_bounce_sequence_3_dots() {
+        // For n=3 forwards bounce is [0,1,2,1]. Backwards mirrors: [2,1,0,1].
+        // With ticks_per_step=3, each step is held for 3 ticks.
+        let expected = [2usize, 2, 2, 1, 1, 1, 0, 0, 0, 1, 1, 1, 2, 2, 2];
+        for (tick, &exp) in expected.iter().enumerate() {
+            let s = LinearSpinner::new(tick as u64)
+                .direction(Direction::Vertical)
+                .flow(Flow::Backwards);
+            assert_eq!(s.bounce_index(), exp, "tick={tick}");
+        }
+    }
+
+    #[test]
+    fn vertical_backwards_bounce_sequence_1_dot() {
+        // Single slot — always index 0 regardless of flow.
+        for tick in 0..10u64 {
+            let s = LinearSpinner::new(tick)
+                .direction(Direction::Vertical)
+                .flow(Flow::Backwards)
+                .total_slots(1);
+            assert_eq!(s.bounce_index(), 0);
+        }
+    }
+
+    #[test]
+    fn flow_forwards_is_default() {
+        let s = LinearSpinner::new(0);
+        assert_eq!(s.flow, Flow::Forwards);
+    }
+
+    #[test]
+    fn flow_default_trait() {
+        assert_eq!(Flow::default(), Flow::Forwards);
     }
 
     #[test]

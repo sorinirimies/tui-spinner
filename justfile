@@ -1,11 +1,45 @@
-# tui-spinner — justfile
-# Install just: cargo install just
+# tui-spinner - task runner
+# Install just:      cargo install just
+# Install git-cliff: cargo install git-cliff
+# Install vhs:       brew install vhs  OR  go install github.com/charmbracelet/vhs@latest
 # Usage: just <task>
+
+# -- Default ---------------------------------------------------------------
 
 default:
     @just --list
 
-# Build the project
+# -- Tool checks -----------------------------------------------------------
+
+_check-git-cliff:
+    @command -v git-cliff >/dev/null 2>&1 || { \
+        echo "git-cliff not found. Install with: cargo install git-cliff"; exit 1; \
+    }
+
+# Check nu (nushell) is available
+_check-nu:
+    @command -v nu >/dev/null 2>&1 || { \
+        echo "nu (nushell) not found. Install: https://www.nushell.sh"; exit 1; \
+    }
+
+_check-vhs:
+    @command -v vhs >/dev/null 2>&1 || { \
+        echo "vhs not found."; \
+        echo "   macOS:      brew install vhs"; \
+        echo "   Any:        go install github.com/charmbracelet/vhs@latest"; \
+        exit 1; \
+    }
+
+# Install all recommended development tools
+install-tools:
+    @echo "Installing development tools..."
+    @command -v git-cliff >/dev/null 2>&1 || cargo install git-cliff
+    @command -v nu >/dev/null 2>&1 && echo "nu found" || echo "nu (nushell) not found. Install: https://www.nushell.sh"
+    @echo "All tools installed!"
+
+# -- Build -----------------------------------------------------------------
+
+# Build the library (dev)
 build:
     cargo build
 
@@ -13,70 +47,223 @@ build:
 build-release:
     cargo build --release
 
+# -- Run -------------------------------------------------------------------
+
 # Run the main spinner demo example
 run:
     cargo run --example spinner
 
-# Run tests
+# -- Test ------------------------------------------------------------------
+
+# Run the Rust test suite
 test:
     cargo test
 
-# Check code without building
+# Run Nu script tests
+test-nu: _check-nu
+    nu scripts/tests/run_all.nu
+
+# Run both Rust and Nu tests
+test-all: test test-nu
+    @echo "All Rust and Nu tests passed!"
+
+# -- Code quality ----------------------------------------------------------
+
+# Check without building
 check:
     cargo check
 
-# Format code
+# Format all code
 fmt:
     cargo fmt
 
-# Check formatting
+# Check formatting without modifying files
 fmt-check:
     cargo fmt --check
 
-# Lint
+# Run clippy
 clippy:
     cargo clippy -- -D warnings
 
-# Run all checks
+# Run all quality checks (fmt, clippy, test) - must pass before a release
 check-all: fmt-check clippy test
-    @echo "✅ All checks passed!"
+    @echo "All checks passed!"
 
-# Generate documentation (opens in browser)
+# -- VHS Demo GIFs --------------------------------------------------------
+
+VHS_DIR       := "examples/vhs"
+VHS_GENERATED := "examples/vhs/generated"
+
+# Generate all VHS demo GIFs
+vhs-all: _check-vhs
+    @mkdir -p {{VHS_GENERATED}}
+    @echo "=== tui-spinner VHS Tapes ==="
+    @for tape in {{VHS_DIR}}/*.tape; do \
+        echo ">>  $$tape"; \
+        vhs "$$tape" || echo "Failed: $$tape"; \
+    done
+    @echo "Demo GIFs generated -> {{VHS_GENERATED}}/"
+
+# Render a single tape by name, e.g.: just vhs-tape spinner-demo
+vhs-tape name: _check-vhs
+    @if [ -f "{{VHS_DIR}}/{{name}}.tape" ]; then \
+        echo ">>  {{VHS_DIR}}/{{name}}.tape"; \
+        vhs "{{VHS_DIR}}/{{name}}.tape" && echo "Done."; \
+    else \
+        echo "Tape not found: {{name}}.tape"; \
+        echo ""; \
+        just vhs-list; \
+        exit 1; \
+    fi
+
+# List all available VHS tapes and any already-generated GIFs
+vhs-list:
+    @echo "Tapes  ->  {{VHS_DIR}}/"
+    @ls {{VHS_DIR}}/*.tape 2>/dev/null | sed 's|.*/||; s|\.tape||' | sed 's/^/  /' || echo "  (none)"
+    @echo ""
+    @echo "Generated  ->  {{VHS_GENERATED}}/"
+    @ls {{VHS_GENERATED}}/*.gif 2>/dev/null | sed 's|.*/||' | sed 's/^/  /' || echo "  (none yet)"
+
+# Pull GIF files from Git LFS (run once after a fresh clone)
+lfs-pull:
+    @command -v git-lfs >/dev/null 2>&1 || { \
+        echo "git-lfs not found. Install with: brew install git-lfs"; exit 1; \
+    }
+    git lfs pull
+    @echo "LFS objects pulled."
+
+# -- Documentation ---------------------------------------------------------
+
+# Generate and open docs in browser
 doc:
     cargo doc --no-deps --open
 
-# Clean build artifacts
-clean:
-    cargo clean
+# -- Changelog -------------------------------------------------------------
 
-# Show current version
-version:
-    @grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/'
+# Regenerate the full CHANGELOG.md from all tags
+changelog: _check-git-cliff
+    @echo "Generating full changelog..."
+    git-cliff --output CHANGELOG.md
+    @echo "CHANGELOG.md updated."
 
-# Publish (dry run)
-publish-dry:
+# Prepend only unreleased commits to CHANGELOG.md
+changelog-unreleased: _check-git-cliff
+    git-cliff --unreleased --prepend CHANGELOG.md
+    @echo "Unreleased changes prepended."
+
+# Preview changelog for the next release without writing the file
+changelog-preview: _check-git-cliff
+    @git-cliff --unreleased
+
+# -- Version bump ----------------------------------------------------------
+# Usage: just bump 0.2.0
+#
+# Runs fmt -> clippy -> test -> changelog -> commit -> tag, then shows push hints.
+
+# Bump the version, regenerate Cargo.lock + CHANGELOG.md, commit and tag.
+bump version: check-all _check-git-cliff _check-nu
+    nu scripts/bump_version.nu --yes {{version}}
+
+# -- Publish (crates.io) --------------------------------------------------
+
+# Run the full pre-publish readiness check (fmt, clippy, tests, docs, dry-run)
+check-publish: _check-nu
+    nu scripts/check_publish.nu
+
+# Dry-run publish
+publish-dry: check-all
     cargo publish --dry-run
 
 # Publish to crates.io
-publish:
+publish: check-all
     cargo publish
 
-# Update dependencies
+# Show what would be released without making any changes
+release-preview: _check-git-cliff
+    @echo "Current version:"
+    @just version
+    @echo ""
+    @echo "Unreleased commits:"
+    @git-cliff --unreleased
+    @echo ""
+    @echo "Published crate:  tui-spinner"
+
+# -- Housekeeping ----------------------------------------------------------
+
+# Remove build artifacts
+clean:
+    cargo clean
+
+# Update all dependencies (Cargo.lock only)
 update:
     cargo update
 
-# Git: push to GitHub
+# Update dependencies, run the full quality gate, then commit and push if all green.
+update-deps:
+    @echo "Updating dependencies..."
+    cargo update
+    @echo "Running quality gate..."
+    cargo fmt --check
+    cargo clippy -- -D warnings
+    cargo test
+    @echo "All checks passed - committing dependency updates..."
+    git add Cargo.lock
+    git diff --cached --quiet || git commit -m "chore: update dependencies"
+    git push origin main
+    @echo "Dependency updates pushed to GitHub."
+
+# Show outdated dependencies (requires cargo-outdated)
+outdated:
+    cargo outdated
+
+# Show the current crate version
+version: _check-nu
+    @nu scripts/version.nu
+
+# -- Git remotes -----------------------------------------------------------
+
+# Push main branch to GitHub
 push:
     git push origin main
 
-# Git: push tags
+# Push tags to GitHub
 push-tags:
     git push origin --tags
 
-# Bump version and tag (usage: just bump 0.2.0)
-bump version: check-all
-    @sed -i 's/^version = ".*"/version = "{{version}}"/' Cargo.toml
-    @git add Cargo.toml
-    @git commit -m "chore: bump version to {{version}}"
-    @git tag v{{version}}
-    @echo "✅ Bumped to v{{version}}"
+# Push main branch to Gitea
+push-gitea:
+    git push gitea main
+
+# Push tags to Gitea
+push-tags-gitea:
+    git push gitea --tags
+
+# Push main to both GitHub and Gitea
+push-all:
+    git push origin main
+    git push gitea main
+
+# Push tags to both remotes
+push-tags-all:
+    git push origin --tags
+    git push gitea --tags
+
+# Push branch + tags to both remotes (after a release bump)
+push-release-all:
+    git push --follow-tags origin main
+    git push --follow-tags gitea main
+
+# Force-sync Gitea from GitHub (overwrite Gitea with origin state)
+sync-gitea:
+    git push gitea main --force
+    git push gitea --tags --force
+
+# Show all configured remotes
+remotes:
+    @git remote -v
+
+# -- Gitea setup -----------------------------------------------------------
+
+# Set up Gitea as a second remote (usage: just setup-gitea <url>)
+setup-gitea url: _check-nu
+    nu scripts/setup_gitea.nu {{url}}

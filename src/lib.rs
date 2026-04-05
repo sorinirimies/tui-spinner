@@ -9,6 +9,9 @@
 //!     across a row (classic ellipsis effect).
 //!   - **[`Direction::Vertical`]** — a single lit symbol bounces up and down a column
 //!     (the "Zed / Copilot" activity indicator pattern).
+//!   - **[`Flow::Forwards`]** (default) — normal animation direction.
+//!   - **[`Flow::Backwards`]** — reversed animation direction (right-to-left for
+//!     horizontal, starts downward for vertical bounce).
 //!
 //!   The symbol set is controlled by [`LinearStyle`]: [`LinearStyle::Classic`],
 //!   [`LinearStyle::Square`], [`LinearStyle::Diamond`], [`LinearStyle::Bar`],
@@ -20,8 +23,7 @@
 //!
 //!   The shape is controlled by [`RectShape`]:
 //!   - [`RectShape::Square`] — square character-cell output; the argument is the
-//!     arc thickness / size parameter.
-//!   - [`RectShape::Narrow`] — a 1-character-wide Zed sidebar style arc.
+//!     arc thickness / size parameter (2–8).
 //!
 //!   The spin direction is controlled by [`Spin`]:
 //!   - [`Spin::Clockwise`] — arc travels clockwise (default).
@@ -31,18 +33,6 @@
 //!   - [`Centre::Filled`] — a solid interior block that alternates colour as
 //!     the arc passes the centre column boundary.
 //!   - [`Centre::Empty`] — no interior fill; only the moving arc is visible.
-//!
-//!   The rendering style is controlled by [`RectStyle`]:
-//!   - [`RectStyle::Arc`]     — exact braille dot-pattern (default)
-//!   - [`RectStyle::Dense`]   — solid `⣿` arc cells
-//!   - [`RectStyle::Shade`]   — `█` / `░` block characters
-//!   - [`RectStyle::Outline`] — `◉` / `○` circle symbols
-//!   - [`RectStyle::Dot`]     — `•` / `·` bullet / middle dot
-//!   - [`RectStyle::Star`]    — `★` / `☆` filled / open star
-//!   - [`RectStyle::Diamond`] — `◆` / `◇` filled / open diamond
-//!   - [`RectStyle::Cross`]   — `╋` / `┼` heavy / light plus
-//!   - [`RectStyle::Fade`]    — `█`/`▓`/`▒` by braille bit density
-//!   - [`RectStyle::Pixel`]   — `▪` / `▫` small filled / open square
 //!
 //! - **[`CircleSpinner`]** — A comet-like arc rotating around a **circular**
 //!   braille-dot ring.  The perimeter is computed with the midpoint circle
@@ -61,8 +51,8 @@
 //! ```no_run
 //! use ratatui::style::Color;
 //! use tui_spinner::{
-//!     Centre, CircleSpinner, Direction, LinearSpinner, LinearStyle,
-//!     RectShape, RectSpinner, RectStyle, Spin,
+//!     Centre, CircleSpinner, Direction, Flow, LinearSpinner, LinearStyle,
+//!     RectShape, RectSpinner, Spin,
 //! };
 //!
 //! // Horizontal ellipsis — default
@@ -74,10 +64,13 @@
 //!     .linear_style(LinearStyle::Diamond)
 //!     .active_color(Color::Cyan);
 //!
+//! // Backwards horizontal scroll (right-to-left)
+//! let bw = LinearSpinner::new(42)
+//!     .flow(Flow::Backwards);
+//!
 //! // Classic filled square arc, clockwise
 //! let sq = RectSpinner::new(42)
 //!     .shape(RectShape::Square(2))
-//!     .render_style(RectStyle::Arc)
 //!     .outer_color(Color::Cyan)
 //!     .inner_color(Color::DarkGray)
 //!     .centre(Centre::Filled);
@@ -86,14 +79,8 @@
 //! let ccw = RectSpinner::new(42)
 //!     .shape(RectShape::Square(3))
 //!     .spin(Spin::CounterClockwise)
-//!     .render_style(RectStyle::Dense)
 //!     .outer_color(Color::Green)
 //!     .centre(Centre::Empty);
-//!
-//! // Narrow (Zed-style) 1-char-wide sidebar arc
-//! let narrow = RectSpinner::new(42)
-//!     .shape(RectShape::Narrow(10))
-//!     .outer_color(Color::Green);
 //!
 //! // Circle spinner — counter-clockwise
 //! let circle = CircleSpinner::new(42)
@@ -134,6 +121,8 @@ mod rect_spinner;
 mod square_spinner;
 
 pub use circle_spinner::CircleSpinner;
-pub use linear_spinner::{Direction, LinearSpinner, LinearStyle};
+pub use linear_spinner::{Direction, Flow, LinearSpinner, LinearStyle};
 pub use rect_spinner::{Centre, RectShape, RectSpinner, Spin};
 pub use square_spinner::SquareSpinner;
+// Note: `Centre` and `Spin` are re-exported from rect_spinner.
+// `SquareSpinner` uses the same `Centre` and `Spin` enums via re-export.
