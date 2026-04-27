@@ -11,7 +11,7 @@
 //!
 //! At `width = 1` / `height = 1` this is a single animated glyph — perfect
 //! as a compact status-bar indicator.  For wider or taller sizes each cell is
-//! offset by [`phase_step`](DotSpinner::phase_step) frames from its neighbour,
+//! offset by [`phase_step`](FluxSpinner::phase_step) frames from its neighbour,
 //! producing a travelling diagonal wave:
 //!
 //! ```text
@@ -30,15 +30,15 @@
 //! use ratatui::style::Color;
 //! use ratatui::Frame;
 //! use ratatui::layout::Rect;
-//! use tui_spinner::{DotSpinner, Spin};
+//! use tui_spinner::{FluxSpinner, Spin};
 //!
 //! fn draw(frame: &mut Frame, area: Rect, tick: u64) {
 //!     // Single-character status-bar spinner (clockwise, default)
-//!     frame.render_widget(DotSpinner::new(tick), area);
+//!     frame.render_widget(FluxSpinner::new(tick), area);
 //!
 //!     // Counter-clockwise wave spanning a full column
 //!     frame.render_widget(
-//!         DotSpinner::new(tick)
+//!         FluxSpinner::new(tick)
 //!             .width(12)
 //!             .spin(Spin::CounterClockwise)
 //!             .color(Color::Cyan),
@@ -95,9 +95,9 @@ const FRAMES: [u8; 8] = [
 /// - [`Spin::Clockwise`] (default) — gap moves clockwise: `⣾ ⣷ ⣯ ⣟ ⡿ ⢿ ⣽ ⣻`
 /// - [`Spin::CounterClockwise`]    — gap moves counter-clockwise: `⣾ ⣻ ⣽ ⢿ ⡿ ⣟ ⣯ ⣷`
 ///
-/// Scaling up via [`width`](DotSpinner::width) / [`height`](DotSpinner::height)
+/// Scaling up via [`width`](FluxSpinner::width) / [`height`](FluxSpinner::height)
 /// adds a configurable per-cell phase offset
-/// ([`phase_step`](DotSpinner::phase_step)) so adjacent characters are
+/// ([`phase_step`](FluxSpinner::phase_step)) so adjacent characters are
 /// staggered in time, producing a smooth diagonal wave across the spinner
 /// block.  The wave direction follows the spin direction.
 ///
@@ -115,19 +115,19 @@ const FRAMES: [u8; 8] = [
 /// # Examples
 ///
 /// ```
-/// use tui_spinner::{DotSpinner, Spin};
+/// use tui_spinner::{FluxSpinner, Spin};
 ///
 /// // Minimal 1×1 clockwise spinner
-/// let s = DotSpinner::new(42);
+/// let s = FluxSpinner::new(42);
 ///
 /// // 8-wide counter-clockwise wave
-/// let wave = DotSpinner::new(42)
+/// let wave = FluxSpinner::new(42)
 ///     .width(8)
 ///     .spin(Spin::CounterClockwise)
 ///     .phase_step(1);
 /// ```
 #[derive(Debug, Clone)]
-pub struct DotSpinner<'a> {
+pub struct FluxSpinner<'a> {
     tick: u64,
     /// Width in character columns (default 1).
     width: usize,
@@ -151,16 +151,16 @@ pub struct DotSpinner<'a> {
     alignment: Alignment,
 }
 
-impl<'a> DotSpinner<'a> {
-    /// Creates a new [`DotSpinner`] with default settings: `1 × 1`,
+impl<'a> FluxSpinner<'a> {
+    /// Creates a new [`FluxSpinner`] with default settings: `1 × 1`,
     /// clockwise, cyan, 1 tick per frame, phase step 1.
     ///
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::DotSpinner;
+    /// use tui_spinner::FluxSpinner;
     ///
-    /// let s = DotSpinner::new(0);
+    /// let s = FluxSpinner::new(0);
     /// ```
     #[must_use]
     pub fn new(tick: u64) -> Self {
@@ -183,9 +183,9 @@ impl<'a> DotSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::DotSpinner;
+    /// use tui_spinner::FluxSpinner;
     ///
-    /// let wide = DotSpinner::new(0).width(6);
+    /// let wide = FluxSpinner::new(0).width(6);
     /// ```
     #[must_use]
     pub fn width(mut self, w: usize) -> Self {
@@ -198,9 +198,9 @@ impl<'a> DotSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::DotSpinner;
+    /// use tui_spinner::FluxSpinner;
     ///
-    /// let tall = DotSpinner::new(0).height(3);
+    /// let tall = FluxSpinner::new(0).height(3);
     /// ```
     #[must_use]
     pub fn height(mut self, h: usize) -> Self {
@@ -215,10 +215,10 @@ impl<'a> DotSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::{DotSpinner, Spin};
+    /// use tui_spinner::{FluxSpinner, Spin};
     ///
-    /// let cw  = DotSpinner::new(0).spin(Spin::Clockwise);
-    /// let ccw = DotSpinner::new(0).spin(Spin::CounterClockwise);
+    /// let cw  = FluxSpinner::new(0).spin(Spin::Clockwise);
+    /// let ccw = FluxSpinner::new(0).spin(Spin::CounterClockwise);
     /// ```
     #[must_use]
     pub const fn spin(mut self, spin: Spin) -> Self {
@@ -232,9 +232,9 @@ impl<'a> DotSpinner<'a> {
     ///
     /// ```
     /// use ratatui::style::Color;
-    /// use tui_spinner::DotSpinner;
+    /// use tui_spinner::FluxSpinner;
     ///
-    /// let s = DotSpinner::new(0).color(Color::White);
+    /// let s = FluxSpinner::new(0).color(Color::White);
     /// ```
     #[must_use]
     pub const fn color(mut self, color: Color) -> Self {
@@ -247,9 +247,9 @@ impl<'a> DotSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::DotSpinner;
+    /// use tui_spinner::FluxSpinner;
     ///
-    /// let slow = DotSpinner::new(0).ticks_per_step(4);
+    /// let slow = FluxSpinner::new(0).ticks_per_step(4);
     /// ```
     #[must_use]
     pub fn ticks_per_step(mut self, n: u64) -> Self {
@@ -266,16 +266,16 @@ impl<'a> DotSpinner<'a> {
     /// | `2`   | Faster / wider wave                                  |
     /// | `4`   | Anti-phase: neighbouring cells spin opposite (`⣾`/`⡿`)|
     ///
-    /// The wave travels in the [`spin`](DotSpinner::spin) direction.
+    /// The wave travels in the [`spin`](FluxSpinner::spin) direction.
     ///
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::DotSpinner;
+    /// use tui_spinner::FluxSpinner;
     ///
-    /// let sync = DotSpinner::new(0).width(4).phase_step(0);
-    /// let wave = DotSpinner::new(0).width(4).phase_step(1);
-    /// let anti = DotSpinner::new(0).width(4).phase_step(4);
+    /// let sync = FluxSpinner::new(0).width(4).phase_step(0);
+    /// let wave = FluxSpinner::new(0).width(4).phase_step(1);
+    /// let anti = FluxSpinner::new(0).width(4).phase_step(4);
     /// ```
     #[must_use]
     pub const fn phase_step(mut self, step: u8) -> Self {
@@ -289,9 +289,9 @@ impl<'a> DotSpinner<'a> {
     ///
     /// ```
     /// use ratatui::widgets::Block;
-    /// use tui_spinner::DotSpinner;
+    /// use tui_spinner::FluxSpinner;
     ///
-    /// let s = DotSpinner::new(0).block(Block::bordered().title("Indexing…"));
+    /// let s = FluxSpinner::new(0).block(Block::bordered().title("Indexing…"));
     /// ```
     #[must_use]
     pub fn block(mut self, block: Block<'a>) -> Self {
@@ -318,9 +318,9 @@ impl<'a> DotSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::DotSpinner;
+    /// use tui_spinner::FluxSpinner;
     ///
-    /// assert_eq!(DotSpinner::new(0).width(5).height(2).char_size(), (5, 2));
+    /// assert_eq!(FluxSpinner::new(0).width(5).height(2).char_size(), (5, 2));
     /// ```
     #[must_use]
     pub fn char_size(&self) -> (usize, usize) {
@@ -365,7 +365,7 @@ impl<'a> DotSpinner<'a> {
 
 // ── Trait impls ───────────────────────────────────────────────────────────────
 
-impl Styled for DotSpinner<'_> {
+impl Styled for FluxSpinner<'_> {
     type Item = Self;
 
     fn style(&self) -> Style {
@@ -378,13 +378,13 @@ impl Styled for DotSpinner<'_> {
     }
 }
 
-impl Widget for DotSpinner<'_> {
+impl Widget for FluxSpinner<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         Widget::render(&self, area, buf);
     }
 }
 
-impl Widget for &DotSpinner<'_> {
+impl Widget for &FluxSpinner<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.area() == 0 {
             return;
@@ -455,28 +455,28 @@ mod tests {
 
     #[test]
     fn cw_advances_each_tick() {
-        let f0 = DotSpinner::new(0).spin(Spin::Clockwise).build_lines();
-        let f1 = DotSpinner::new(1).spin(Spin::Clockwise).build_lines();
+        let f0 = FluxSpinner::new(0).spin(Spin::Clockwise).build_lines();
+        let f1 = FluxSpinner::new(1).spin(Spin::Clockwise).build_lines();
         assert_ne!(f0, f1, "consecutive ticks should produce different frames");
     }
 
     #[test]
     fn cw_wraps_after_eight_steps() {
-        let f0 = DotSpinner::new(0).spin(Spin::Clockwise).build_lines();
-        let f8 = DotSpinner::new(8).spin(Spin::Clockwise).build_lines();
+        let f0 = FluxSpinner::new(0).spin(Spin::Clockwise).build_lines();
+        let f8 = FluxSpinner::new(8).spin(Spin::Clockwise).build_lines();
         assert_eq!(f0, f8, "should wrap back to frame 0 after 8 ticks");
     }
 
     #[test]
     fn ticks_per_step_slows_animation() {
-        let a = DotSpinner::new(0).ticks_per_step(4).build_lines();
-        let b = DotSpinner::new(3).ticks_per_step(4).build_lines();
+        let a = FluxSpinner::new(0).ticks_per_step(4).build_lines();
+        let b = FluxSpinner::new(3).ticks_per_step(4).build_lines();
         assert_eq!(
             a, b,
             "ticks 0–3 should all be frame 0 when ticks_per_step=4"
         );
 
-        let c = DotSpinner::new(4).ticks_per_step(4).build_lines();
+        let c = FluxSpinner::new(4).ticks_per_step(4).build_lines();
         assert_ne!(a, c, "tick 4 should advance to frame 1");
     }
 
@@ -484,8 +484,8 @@ mod tests {
 
     #[test]
     fn cw_and_ccw_differ_at_same_tick() {
-        let cw = DotSpinner::new(1).spin(Spin::Clockwise).build_lines();
-        let ccw = DotSpinner::new(1)
+        let cw = FluxSpinner::new(1).spin(Spin::Clockwise).build_lines();
+        let ccw = FluxSpinner::new(1)
             .spin(Spin::CounterClockwise)
             .build_lines();
         assert_ne!(
@@ -497,8 +497,8 @@ mod tests {
     #[test]
     fn cw_and_ccw_agree_at_tick_zero() {
         // Frame index 0 for CW: (8 - 0) % 8 == 0 for CCW — both start at FRAMES[0].
-        let cw = DotSpinner::new(0).spin(Spin::Clockwise).build_lines();
-        let ccw = DotSpinner::new(0)
+        let cw = FluxSpinner::new(0).spin(Spin::Clockwise).build_lines();
+        let ccw = FluxSpinner::new(0)
             .spin(Spin::CounterClockwise)
             .build_lines();
         assert_eq!(cw, ccw, "both directions share frame 0 at tick 0");
@@ -508,8 +508,8 @@ mod tests {
     fn ccw_is_reverse_of_cw() {
         // CW tick 1 == CCW tick 7, because (8 - 1) % 8 == 7 and 1 % 8 == 1
         // are symmetric: CW[1] == CCW[7].
-        let cw_1 = DotSpinner::new(1).spin(Spin::Clockwise).build_lines();
-        let ccw_7 = DotSpinner::new(7)
+        let cw_1 = FluxSpinner::new(1).spin(Spin::Clockwise).build_lines();
+        let ccw_7 = FluxSpinner::new(7)
             .spin(Spin::CounterClockwise)
             .build_lines();
         assert_eq!(cw_1, ccw_7, "CW tick 1 should equal CCW tick 7");
@@ -517,10 +517,10 @@ mod tests {
 
     #[test]
     fn ccw_wraps_after_eight_steps() {
-        let f0 = DotSpinner::new(0)
+        let f0 = FluxSpinner::new(0)
             .spin(Spin::CounterClockwise)
             .build_lines();
-        let f8 = DotSpinner::new(8)
+        let f8 = FluxSpinner::new(8)
             .spin(Spin::CounterClockwise)
             .build_lines();
         assert_eq!(f0, f8, "CCW should wrap back to frame 0 after 8 ticks");
@@ -528,12 +528,12 @@ mod tests {
 
     #[test]
     fn ccw_wave_differs_from_cw_wave() {
-        let cw = DotSpinner::new(1)
+        let cw = FluxSpinner::new(1)
             .width(4)
             .phase_step(1)
             .spin(Spin::Clockwise)
             .build_lines();
-        let ccw = DotSpinner::new(1)
+        let ccw = FluxSpinner::new(1)
             .width(4)
             .phase_step(1)
             .spin(Spin::CounterClockwise)
@@ -548,7 +548,7 @@ mod tests {
 
     #[test]
     fn phase_step_zero_all_cells_same() {
-        let lines = DotSpinner::new(0).width(4).phase_step(0).build_lines();
+        let lines = FluxSpinner::new(0).width(4).phase_step(0).build_lines();
         let spans = &lines[0].spans;
         let first = &spans[0].content;
         for s in spans.iter().skip(1) {
@@ -558,7 +558,7 @@ mod tests {
 
     #[test]
     fn phase_step_one_cells_differ() {
-        let lines = DotSpinner::new(0).width(4).phase_step(1).build_lines();
+        let lines = FluxSpinner::new(0).width(4).phase_step(1).build_lines();
         let spans = &lines[0].spans;
         for pair in spans.windows(2) {
             assert_ne!(
@@ -570,8 +570,8 @@ mod tests {
 
     #[test]
     fn phase_step_eight_wraps_to_same() {
-        let base = DotSpinner::new(0).width(3).phase_step(0).build_lines();
-        let wrap = DotSpinner::new(0).width(3).phase_step(8).build_lines();
+        let base = FluxSpinner::new(0).width(3).phase_step(0).build_lines();
+        let wrap = FluxSpinner::new(0).width(3).phase_step(8).build_lines();
         assert_eq!(base, wrap, "phase_step=8 should behave like phase_step=0");
     }
 
@@ -581,7 +581,7 @@ mod tests {
     fn output_dimensions_match_width_height() {
         for w in 1..=5usize {
             for h in 1..=3usize {
-                let lines = DotSpinner::new(0).width(w).height(h).build_lines();
+                let lines = FluxSpinner::new(0).width(w).height(h).build_lines();
                 assert_eq!(lines.len(), h, "height={h}");
                 for (i, line) in lines.iter().enumerate() {
                     assert_eq!(line.spans.len(), w, "row {i}: width={w}");
@@ -592,13 +592,13 @@ mod tests {
 
     #[test]
     fn char_size_returns_width_height() {
-        let s = DotSpinner::new(0).width(4).height(2);
+        let s = FluxSpinner::new(0).width(4).height(2);
         assert_eq!(s.char_size(), (4, 2));
     }
 
     #[test]
     fn char_size_clamps_to_one() {
-        let s = DotSpinner::new(0).width(0).height(0);
+        let s = FluxSpinner::new(0).width(0).height(0);
         let (w, h) = s.char_size();
         assert!(w >= 1);
         assert!(h >= 1);
@@ -612,7 +612,7 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
-                frame.render_widget(DotSpinner::new(42).width(3).height(2), frame.area());
+                frame.render_widget(FluxSpinner::new(42).width(3).height(2), frame.area());
             })
             .unwrap();
     }
@@ -623,7 +623,7 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
-                frame.render_widget(DotSpinner::new(0), frame.area());
+                frame.render_widget(FluxSpinner::new(0), frame.area());
             })
             .unwrap();
     }
@@ -634,7 +634,7 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
-                frame.render_widget(DotSpinner::new(0), frame.area());
+                frame.render_widget(FluxSpinner::new(0), frame.area());
             })
             .unwrap();
     }
@@ -644,7 +644,7 @@ mod tests {
     #[test]
     fn builder_chain() {
         use ratatui::widgets::Block;
-        let s = DotSpinner::new(99)
+        let s = FluxSpinner::new(99)
             .width(6)
             .height(2)
             .spin(Spin::CounterClockwise)
@@ -665,7 +665,7 @@ mod tests {
     fn output_contains_only_valid_braille() {
         for tick in 0..8u64 {
             for spin in [Spin::Clockwise, Spin::CounterClockwise] {
-                let lines = DotSpinner::new(tick)
+                let lines = FluxSpinner::new(tick)
                     .width(4)
                     .height(2)
                     .spin(spin)

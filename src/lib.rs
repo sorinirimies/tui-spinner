@@ -130,14 +130,14 @@
 
 mod bar_spinner;
 mod circle_spinner;
-mod dot_spinner;
+mod flux_spinner;
 mod linear_spinner;
 mod rect_spinner;
 mod square_spinner;
 
 pub use bar_spinner::BarSpinner;
 pub use circle_spinner::CircleSpinner;
-pub use dot_spinner::DotSpinner;
+pub use flux_spinner::FluxSpinner;
 pub use linear_spinner::{Direction, Flow, LinearSpinner, LinearStyle};
 pub use rect_spinner::{Centre, RectShape, RectSpinner, Spin};
 pub use square_spinner::SquareSpinner;

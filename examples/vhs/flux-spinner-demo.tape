@@ -1,7 +1,7 @@
-# VHS tape for DotSpinner — rotating braille dot demo
-# Run: vhs examples/vhs/dot-spinner-demo.tape
+# VHS tape for FluxSpinner — rotating braille dot demo
+# Run: vhs examples/vhs/flux-spinner-demo.tape
 
-Output examples/vhs/generated/dot-spinner-demo.gif
+Output examples/vhs/generated/flux-spinner-demo.gif
 
 Set Theme "Catppuccin Mocha"
 Set Width 1400
@@ -9,7 +9,7 @@ Set Height 900
 Set FontSize 14
 Set PlaybackSpeed 1.0
 
-Type "cargo run --example dot_spinner"
+Type "cargo run --example flux_spinner"
 Enter
 
 # Wait for compilation and startup
