@@ -1,13 +1,18 @@
 //! # RectangularSpinner Example
 //!
 //! Demonstrates the [`RectangularSpinner`] widget — a Zed / Claude-style
-//! braille-dot arc that bounces back and forth along a rectangle perimeter.
+//! braille loading bar where a glowing arc bounces left and right.
 //!
-//! Showcases:
-//! - **Col 1** — Compact spinners (width 6–10, height 2–3) — "Zed style"
-//! - **Col 2** — Wide banner spinners (width 16–20, height 2) — "Claude style"
-//! - **Col 3** — Tall spinners (height 4–5) with both CW and CCW starts
-//! - **Col 4** — Custom arc lengths and speeds
+//! Every row spans the **full column width** so the animation looks exactly
+//! like real Zed or Claude loading indicators (not tiny box outlines).
+//!
+//! Layout (top → bottom):
+//! - **Zed-style**  — 1-row bars, cyan / blue palette
+//! - **Claude-style** — 2-row bars, warm orange / yellow palette
+//! - **Thick**      — 3-row bars
+//! - **Pairs**      — CW + CCW side-by-side at the same tick so you can see
+//!                    the ping-pong offset between the two directions
+//! - **Arc widths** — narrow → wide arcs on the same bar width
 //!
 //! **Controls:**
 //! - `q` / `Esc` — Quit
@@ -26,7 +31,7 @@ use ratatui::{
 use std::time::{Duration, Instant};
 use tui_spinner::{RectangularSpinner, Spin};
 
-// ── App state ─────────────────────────────────────────────────────────────────
+// ── App ───────────────────────────────────────────────────────────────────────
 
 struct App {
     tick: u64,
@@ -42,8 +47,6 @@ impl Default for App {
     }
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────────
-
 fn main() -> Result<()> {
     color_eyre::install()?;
     let mut app = App::default();
@@ -58,7 +61,6 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
         let now = Instant::now();
         let delta = now.duration_since(app.last_tick);
         app.last_tick = now;
-
         let steps = (delta.as_millis() / 80).max(1) as u64;
         app.tick = app.tick.wrapping_add(steps);
 
@@ -76,10 +78,10 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
     Ok(())
 }
 
-// ── Top-level layout ──────────────────────────────────────────────────────────
+// ── Root layout ───────────────────────────────────────────────────────────────
 
 fn render(frame: &mut Frame, app: &App) {
-    let [header, content, footer] = Layout::vertical([
+    let [header, body, footer] = Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(0),
         Constraint::Length(3),
@@ -87,32 +89,31 @@ fn render(frame: &mut Frame, app: &App) {
     .areas(frame.area());
 
     render_header(frame, header);
-    render_content(frame, content, app.tick);
+    render_body(frame, body, app.tick);
     render_footer(frame, footer);
 }
 
 fn render_header(frame: &mut Frame, area: Rect) {
     let block = Block::bordered()
-        .title(" RectangularSpinner — Zed / Claude-style bouncing arc ")
+        .title(" RectangularSpinner — Zed / Claude-style bouncing bar ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan))
-        .padding(Padding::horizontal(1));
+        .border_style(Style::default().fg(Color::Cyan));
 
-    let text = Paragraph::new("Compact · Wide Banner · Tall · Custom Arc")
+    let subtitle = Paragraph::new("full-width bars · gradient arc · ping-pong bounce")
         .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::Gray));
+        .style(Style::default().fg(Color::DarkGray))
+        .block(block);
 
-    frame.render_widget(text.block(block), area);
+    frame.render_widget(subtitle, area);
 }
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .padding(Padding::horizontal(1));
+        .border_style(Style::default().fg(Color::DarkGray));
 
-    let text = Line::from(vec![
+    let line = Line::from(vec![
         Span::styled(
             "q",
             Style::default()
@@ -130,375 +131,401 @@ fn render_footer(frame: &mut Frame, area: Rect) {
     ]);
 
     frame.render_widget(
-        Paragraph::new(text)
+        Paragraph::new(line)
             .alignment(Alignment::Center)
             .block(block),
         area,
     );
 }
 
-fn render_content(frame: &mut Frame, area: Rect, tick: u64) {
-    let [col_compact, col_wide, col_tall, col_custom] = Layout::horizontal([
-        Constraint::Percentage(25),
-        Constraint::Percentage(25),
-        Constraint::Percentage(25),
-        Constraint::Percentage(25),
+// ── Body — two-column layout ──────────────────────────────────────────────────
+//
+//  Left  (60 %): stacked full-width bars with labels
+//  Right (40 %): arc-width comparison + pair demo
+
+fn render_body(frame: &mut Frame, area: Rect, tick: u64) {
+    let [left, right] =
+        Layout::horizontal([Constraint::Percentage(60), Constraint::Percentage(40)]).areas(area);
+
+    render_left(frame, left, tick);
+    render_right(frame, right, tick);
+}
+
+// ── Left panel ────────────────────────────────────────────────────────────────
+
+fn render_left(frame: &mut Frame, area: Rect, tick: u64) {
+    // Three sections stacked: Zed / Claude / Thick
+    let [zed_area, claude_area, thick_area] = Layout::vertical([
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
     ])
     .areas(area);
 
-    render_compact_column(frame, col_compact, tick);
-    render_wide_column(frame, col_wide, tick);
-    render_tall_column(frame, col_tall, tick);
-    render_custom_column(frame, col_custom, tick);
+    render_zed_section(frame, zed_area, tick);
+    render_claude_section(frame, claude_area, tick);
+    render_thick_section(frame, thick_area, tick);
 }
 
-// ── Col 1 — Compact spinners (Zed style) ─────────────────────────────────────
+// ── Zed-style section (1-row bars) ───────────────────────────────────────────
 
-fn render_compact_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" Compact · Zed style ")
+/// (arc_color, dim_color, spin, ticks_per_step, label)
+const ZED_CONFIGS: &[(Color, Color, Spin, u64, &str)] = &[
+    (Color::Cyan, Color::DarkGray, Spin::Clockwise, 1, "cyan   ↻"),
+    (
+        Color::LightBlue,
+        Color::DarkGray,
+        Spin::CounterClockwise,
+        1,
+        "blue   ↺",
+    ),
+    (
+        Color::White,
+        Color::DarkGray,
+        Spin::Clockwise,
+        2,
+        "white  ↻  slow",
+    ),
+    (
+        Color::LightCyan,
+        Color::Rgb(0, 30, 40),
+        Spin::CounterClockwise,
+        1,
+        "cyan   ↺  dark bg",
+    ),
+    (
+        Color::Cyan,
+        Color::Black,
+        Spin::Clockwise,
+        1,
+        "cyan   ↻  no track",
+    ),
+];
+
+fn render_zed_section(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = Block::bordered()
+        .title(" Zed-style  ·  1 row  ·  height(1) ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Cyan))
-        .padding(Padding::uniform(1));
+        .padding(Padding::horizontal(1));
 
-    let inner = outer_block.inner(area);
-    frame.render_widget(outer_block, area);
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
 
-    // (width, height, arc_color, dim_color, spin, ticks_per_step, label)
-    let configs: &[(usize, usize, Color, Color, Spin, u64, &str)] = &[
-        (
-            6,
-            2,
-            Color::Cyan,
-            Color::DarkGray,
-            Spin::Clockwise,
-            1,
-            "6×2  ↻  cyan",
-        ),
-        (
-            8,
-            2,
-            Color::LightBlue,
-            Color::DarkGray,
-            Spin::CounterClockwise,
-            1,
-            "8×2  ↺  blue",
-        ),
-        (
-            6,
-            3,
-            Color::Cyan,
-            Color::DarkGray,
-            Spin::Clockwise,
-            2,
-            "6×3  ↻  slow",
-        ),
-        (
-            8,
-            3,
-            Color::LightCyan,
-            Color::DarkGray,
-            Spin::CounterClockwise,
-            1,
-            "8×3  ↺  cyan",
-        ),
-        (
-            10,
-            2,
-            Color::White,
-            Color::DarkGray,
-            Spin::Clockwise,
-            1,
-            "10×2 ↻  white",
-        ),
-        (
-            10,
-            3,
-            Color::Cyan,
-            Color::Blue,
-            Spin::CounterClockwise,
-            2,
-            "10×3 ↺  blue bg",
-        ),
-    ];
-
-    let row_h = 1u16.max(inner.height / configs.len() as u16);
-    let constraints: Vec<Constraint> = configs
-        .iter()
+    let n = ZED_CONFIGS.len();
+    let row_h = (inner.height / n as u16).max(1);
+    let constraints: Vec<Constraint> = (0..n)
         .map(|_| Constraint::Length(row_h))
         .chain([Constraint::Min(0)])
         .collect();
     let rows = Layout::vertical(constraints).split(inner);
 
-    for (i, &(w, h, arc, dim, spin, tps, label)) in configs.iter().enumerate() {
-        if i >= rows.len() {
+    for (i, &(arc, dim, spin, tps, label)) in ZED_CONFIGS.iter().enumerate() {
+        if i >= rows.len().saturating_sub(1) {
             break;
         }
-        let row = rows[i];
-        let spinner_w = w as u16;
-        let [spinner_area, label_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Min(0)]).areas(row);
-
-        frame.render_widget(
-            RectangularSpinner::new(tick)
-                .width(w)
-                .height(h)
-                .spin(spin)
-                .arc_color(arc)
-                .dim_color(dim)
-                .ticks_per_step(tps),
-            spinner_area,
-        );
-        frame.render_widget(
-            Paragraph::new(Span::styled(format!(" {label}"), Style::default().fg(arc))),
-            label_area,
-        );
+        render_bar_row(frame, rows[i], tick, 1, arc, dim, spin, tps, label);
     }
 }
 
-// ── Col 2 — Wide banner spinners (Claude style) ───────────────────────────────
+// ── Claude-style section (2-row bars) ────────────────────────────────────────
 
-fn render_wide_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" Wide Banner · Claude style ")
+const CLAUDE_CONFIGS: &[(Color, Color, Spin, u64, &str)] = &[
+    (
+        Color::Yellow,
+        Color::DarkGray,
+        Spin::Clockwise,
+        1,
+        "yellow   ↻",
+    ),
+    (
+        Color::LightYellow,
+        Color::DarkGray,
+        Spin::CounterClockwise,
+        1,
+        "lt-yel   ↺",
+    ),
+    (
+        Color::Rgb(255, 165, 0),
+        Color::DarkGray,
+        Spin::Clockwise,
+        2,
+        "orange   ↻  slow",
+    ),
+    (
+        Color::Rgb(255, 200, 50),
+        Color::Rgb(60, 30, 0),
+        Spin::CounterClockwise,
+        1,
+        "amber    ↺  warm bg",
+    ),
+];
+
+fn render_claude_section(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = Block::bordered()
+        .title(" Claude-style  ·  2 rows  ·  height(2) ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Yellow))
-        .padding(Padding::uniform(1));
+        .padding(Padding::horizontal(1));
 
-    let inner = outer_block.inner(area);
-    frame.render_widget(outer_block, area);
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
 
-    // Claude-ish warm/orange palette — wide, 2-row banners
-    let configs: &[(usize, Color, Color, Spin, u64, &str)] = &[
-        (
-            18,
-            Color::Yellow,
-            Color::DarkGray,
-            Spin::Clockwise,
-            1,
-            "↻ yellow",
-        ),
-        (
-            18,
-            Color::LightYellow,
-            Color::DarkGray,
-            Spin::CounterClockwise,
-            1,
-            "↺ lt-yellow",
-        ),
-        (
-            18,
-            Color::Rgb(255, 165, 0),
-            Color::DarkGray,
-            Spin::Clockwise,
-            2,
-            "↻ orange",
-        ),
-        (
-            18,
-            Color::Rgb(255, 200, 50),
-            Color::Rgb(80, 40, 0),
-            Spin::CounterClockwise,
-            1,
-            "↺ warm bg",
-        ),
-        (
-            18,
-            Color::White,
-            Color::DarkGray,
-            Spin::Clockwise,
-            1,
-            "↻ white",
-        ),
-        (
-            18,
-            Color::LightRed,
-            Color::DarkGray,
-            Spin::CounterClockwise,
-            2,
-            "↺ lt-red",
-        ),
-    ];
-
-    let row_h = 2u16.max(inner.height / configs.len() as u16);
-    let constraints: Vec<Constraint> = configs
-        .iter()
+    let n = CLAUDE_CONFIGS.len();
+    let row_h = (inner.height / n as u16).max(2);
+    let constraints: Vec<Constraint> = (0..n)
         .map(|_| Constraint::Length(row_h))
         .chain([Constraint::Min(0)])
         .collect();
     let rows = Layout::vertical(constraints).split(inner);
 
-    for (i, &(w, arc, dim, spin, tps, label)) in configs.iter().enumerate() {
-        if i >= rows.len() {
+    for (i, &(arc, dim, spin, tps, label)) in CLAUDE_CONFIGS.iter().enumerate() {
+        if i >= rows.len().saturating_sub(1) {
             break;
         }
-        let row = rows[i];
-
-        // Clamp width to available space
-        let avail_w = row.width.saturating_sub(12);
-        let actual_w = w.min(avail_w as usize).max(3);
-        let spinner_w = actual_w as u16;
-
-        let [spinner_area, label_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Min(0)]).areas(row);
-
-        frame.render_widget(
-            RectangularSpinner::new(tick)
-                .width(actual_w)
-                .height(2)
-                .spin(spin)
-                .arc_color(arc)
-                .dim_color(dim)
-                .ticks_per_step(tps),
-            spinner_area,
-        );
-        frame.render_widget(
-            Paragraph::new(Span::styled(format!(" {label}"), Style::default().fg(arc))),
-            label_area,
-        );
+        render_bar_row(frame, rows[i], tick, 2, arc, dim, spin, tps, label);
     }
 }
 
-// ── Col 3 — Tall spinners (both directions) ───────────────────────────────────
+// ── Thick section (3-row bars) ───────────────────────────────────────────────
 
-fn render_tall_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" Tall · Both Directions ")
+const THICK_CONFIGS: &[(Color, Color, Spin, u64, &str)] = &[
+    (
+        Color::Green,
+        Color::DarkGray,
+        Spin::Clockwise,
+        1,
+        "green    ↻",
+    ),
+    (
+        Color::LightGreen,
+        Color::DarkGray,
+        Spin::CounterClockwise,
+        1,
+        "lt-green ↺",
+    ),
+    (
+        Color::Magenta,
+        Color::DarkGray,
+        Spin::Clockwise,
+        2,
+        "magenta  ↻  slow",
+    ),
+];
+
+fn render_thick_section(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = Block::bordered()
+        .title(" Thick  ·  3 rows  ·  height(3) ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Magenta))
-        .padding(Padding::uniform(1));
+        .border_style(Style::default().fg(Color::Green))
+        .padding(Padding::horizontal(1));
 
-    let inner = outer_block.inner(area);
-    frame.render_widget(outer_block, area);
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
 
-    // Side-by-side CW and CCW pairs
-    let configs: &[(usize, usize, Color, Spin, u64)] = &[
-        (6, 4, Color::Magenta, Spin::Clockwise, 1),
-        (6, 4, Color::LightMagenta, Spin::CounterClockwise, 1),
-        (8, 5, Color::Green, Spin::Clockwise, 2),
-        (8, 5, Color::LightGreen, Spin::CounterClockwise, 2),
-    ];
-
-    let n = configs.len();
-    let row_h = inner.height / n as u16;
+    let n = THICK_CONFIGS.len();
+    let row_h = (inner.height / n as u16).max(3);
     let constraints: Vec<Constraint> = (0..n)
-        .map(|_| Constraint::Length(row_h.max(1)))
+        .map(|_| Constraint::Length(row_h))
         .chain([Constraint::Min(0)])
         .collect();
     let rows = Layout::vertical(constraints).split(inner);
 
-    for (i, &(w, h, color, spin, tps)) in configs.iter().enumerate() {
-        if i >= rows.len() {
+    for (i, &(arc, dim, spin, tps, label)) in THICK_CONFIGS.iter().enumerate() {
+        if i >= rows.len().saturating_sub(1) {
             break;
         }
-        let row = rows[i];
-        let dir_label = if matches!(spin, Spin::Clockwise) {
-            "↻ CW "
-        } else {
-            "↺ CCW"
-        };
+        render_bar_row(frame, rows[i], tick, 3, arc, dim, spin, tps, label);
+    }
+}
 
-        let spinner_w = w as u16;
-        let [spinner_area, label_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Min(0)]).areas(row);
+// ── Right panel ───────────────────────────────────────────────────────────────
 
-        frame.render_widget(
-            RectangularSpinner::new(tick)
-                .width(w)
-                .height(h)
-                .spin(spin)
-                .arc_color(color)
-                .dim_color(Color::DarkGray)
-                .ticks_per_step(tps),
-            spinner_area,
+fn render_right(frame: &mut Frame, area: Rect, tick: u64) {
+    let [pairs_area, arc_area] =
+        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(area);
+
+    render_pairs_section(frame, pairs_area, tick);
+    render_arc_section(frame, arc_area, tick);
+}
+
+// ── CW / CCW pairs ────────────────────────────────────────────────────────────
+//
+// Two bars at the same tick but opposite start directions — you can see them
+// moving away from each other and bouncing back in sync.
+
+const PAIR_CONFIGS: &[(Color, u64, &str)] = &[
+    (Color::Cyan, 1, "cyan"),
+    (Color::Yellow, 1, "yellow"),
+    (Color::Magenta, 2, "magenta"),
+];
+
+fn render_pairs_section(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = Block::bordered()
+        .title(" CW ↻ vs CCW ↺  ·  same tick ")
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::LightCyan))
+        .padding(Padding::horizontal(1));
+
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
+
+    // Each pair takes two rows (CW on top, CCW below) + 1 gap.
+    let n = PAIR_CONFIGS.len();
+    let pair_h = (inner.height / n as u16).max(2);
+    let constraints: Vec<Constraint> = (0..n)
+        .map(|_| Constraint::Length(pair_h))
+        .chain([Constraint::Min(0)])
+        .collect();
+    let slots = Layout::vertical(constraints).split(inner);
+
+    for (i, &(color, tps, label)) in PAIR_CONFIGS.iter().enumerate() {
+        if i >= slots.len().saturating_sub(1) {
+            break;
+        }
+        let slot = slots[i];
+
+        // Split each slot: top row = CW, bottom row = CCW.
+        let [cw_row, ccw_row] =
+            Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(slot);
+
+        render_bar_row(
+            frame,
+            cw_row,
+            tick,
+            1,
+            color,
+            Color::DarkGray,
+            Spin::Clockwise,
+            tps,
+            &format!("{label} ↻"),
         );
-        frame.render_widget(
-            Paragraph::new(Span::styled(
-                format!(" {dir_label} {w}×{h}"),
-                Style::default().fg(color),
-            )),
-            label_area,
+        render_bar_row(
+            frame,
+            ccw_row,
+            tick,
+            1,
+            color,
+            Color::DarkGray,
+            Spin::CounterClockwise,
+            tps,
+            &format!("{label} ↺"),
         );
     }
 }
 
-// ── Col 4 — Custom arc lengths and speeds ────────────────────────────────────
+// ── Arc-width comparison ──────────────────────────────────────────────────────
 
-fn render_custom_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" Custom Arc & Speed ")
+/// (arc_width_chars, label)
+const ARC_WIDTHS: &[(usize, &str)] = &[
+    (3, "arc=3  narrow"),
+    (6, "arc=6"),
+    (10, "arc=10"),
+    (0, "arc=auto"),
+];
+
+fn render_arc_section(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = Block::bordered()
+        .title(" Arc width comparison ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::LightRed))
-        .padding(Padding::uniform(1));
+        .padding(Padding::horizontal(1));
 
-    let inner = outer_block.inner(area);
-    frame.render_widget(outer_block, area);
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
 
-    // (width, height, arc_len, color, spin, ticks_per_step, label)
-    let configs: &[(usize, usize, usize, Color, Spin, u64, &str)] = &[
-        (8, 3, 4, Color::Red, Spin::Clockwise, 1, "arc=4  fast"),
-        (
-            8,
-            3,
-            8,
-            Color::LightRed,
-            Spin::CounterClockwise,
-            1,
-            "arc=8  fast",
-        ),
-        (8, 3, 12, Color::Yellow, Spin::Clockwise, 2, "arc=12 med"),
-        (
-            8,
-            3,
-            20,
-            Color::Green,
-            Spin::CounterClockwise,
-            3,
-            "arc=20 slow",
-        ),
-        (8, 3, 30, Color::Magenta, Spin::Clockwise, 4, "arc=30 vslow"),
-        (8, 3, 0, Color::Cyan, Spin::CounterClockwise, 1, "arc=auto"),
-    ];
-
-    let row_h = 1u16.max(inner.height / configs.len() as u16);
-    let constraints: Vec<Constraint> = configs
-        .iter()
+    let n = ARC_WIDTHS.len();
+    let row_h = (inner.height / n as u16).max(1);
+    let constraints: Vec<Constraint> = (0..n)
         .map(|_| Constraint::Length(row_h))
         .chain([Constraint::Min(0)])
         .collect();
     let rows = Layout::vertical(constraints).split(inner);
 
-    for (i, &(w, h, arc, color, spin, tps, label)) in configs.iter().enumerate() {
-        if i >= rows.len() {
+    for (i, &(arc_w, label)) in ARC_WIDTHS.iter().enumerate() {
+        if i >= rows.len().saturating_sub(1) {
             break;
         }
         let row = rows[i];
-        let spinner_w = w as u16;
-
+        // Label on the right; spinner fills the remaining width.
+        let label_w = label.len() as u16 + 2;
         let [spinner_area, label_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Min(0)]).areas(row);
+            Layout::horizontal([Constraint::Min(4), Constraint::Length(label_w)]).areas(row);
 
         frame.render_widget(
             RectangularSpinner::new(tick)
-                .width(w)
-                .height(h)
-                .arc_len(arc)
-                .spin(spin)
-                .arc_color(color)
+                .arc_width(arc_w)
+                .height(1)
+                .spin(Spin::Clockwise)
+                .arc_color(Color::LightRed)
                 .dim_color(Color::DarkGray)
-                .ticks_per_step(tps),
+                .ticks_per_step(1),
             spinner_area,
         );
         frame.render_widget(
             Paragraph::new(Span::styled(
                 format!(" {label}"),
-                Style::default().fg(color),
+                Style::default().fg(Color::DarkGray),
             )),
             label_area,
         );
     }
+}
+
+// ── Shared helper: render one full-width bar + right-aligned label ────────────
+
+fn render_bar_row(
+    frame: &mut Frame,
+    row: Rect,
+    tick: u64,
+    height: usize,
+    arc_color: Color,
+    dim_color: Color,
+    spin: Spin,
+    ticks_per_step: u64,
+    label: &str,
+) {
+    // Reserve just enough space on the right for the label.
+    let label_w = (label.len() as u16 + 2).min(row.width.saturating_sub(4));
+    let spinner_w = row.width.saturating_sub(label_w);
+
+    let [spinner_area, label_area] =
+        Layout::horizontal([Constraint::Length(spinner_w), Constraint::Length(label_w)]).areas(row);
+
+    frame.render_widget(
+        RectangularSpinner::new(tick)
+            .height(height)
+            // width = 0 → fill spinner_area automatically
+            .spin(spin)
+            .arc_color(arc_color)
+            .dim_color(dim_color)
+            .ticks_per_step(ticks_per_step),
+        spinner_area,
+    );
+
+    // Vertically centre the label within the row.
+    let label_row = if row.height > 1 {
+        let [_, mid, _] = Layout::vertical([
+            Constraint::Length(row.height / 2),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .areas(label_area);
+        mid
+    } else {
+        label_area
+    };
+
+    frame.render_widget(
+        Paragraph::new(Span::styled(
+            format!(" {label}"),
+            Style::default().fg(arc_color),
+        )),
+        label_row,
+    );
 }

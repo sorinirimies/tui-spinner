@@ -1,18 +1,30 @@
 //! Rectangle braille-arc bouncing spinner.
 //!
-//! A Zed / Claude-style comet arc bounces back and forth along the perimeter
-//! of a braille-dot rectangle.  Unlike [`crate::RectSpinner`] which rotates
-//! continuously, this spinner **reverses direction** when the arc reaches
-//! either end of the perimeter, producing a characteristic ping-pong effect.
+//! A Zed / Claude-style loading bar: every character cell is filled with a
+//! braille glyph; a bright arc window slides left-to-right (and bounces) over
+//! a dimmer background track.  The arc edges taper through a braille density
+//! ramp so the animation looks like a soft glowing comet.
+//!
+//! Set [`RectangularSpinner::width`] to `0` (the default) to fill the
+//! available terminal width automatically.
+//!
+//! ## Visual
+//!
+//! ```text
+//! ⣀⣀⣀⣀⠉⠛⠿⣿⣿⣿⣿⣿⣿⠿⠛⠉⣀⣀⣀⣀⣀⣀⣀⣀
+//! ```
+//!
+//! The outer-edge columns of the arc (`⠉ ⠛ ⠿`) taper from a short
+//! top-row glyph up to full density, giving a smooth gradient.
+//! The dim background track uses `⣀` (bottom-two-dot rail).
 //!
 //! ## How it works
 //!
-//! 1. The perimeter of a `width × height` character rectangle is enumerated
-//!    clockwise in 1:1 braille-dot coordinates: top edge → right edge →
-//!    bottom edge → left edge.
-//! 2. A sliding window of `arc_len` dots advances along the perimeter each
-//!    step; when the leading edge reaches either end it reverses.
-//! 3. The dot grid is packed into braille bytes and rendered as [`Line`]s.
+//! 1. A `width × height` character grid is rendered; arc columns use the
+//!    full-dot glyph `⣿` in `arc_color`, dim columns use `⣀` in `dim_color`.
+//! 2. The three outermost columns on each arc edge use the fade ramp
+//!    `⠉ ⠛ ⠿` so the arc blends into the track.
+//! 3. The arc window advances one column per step and reverses at each end.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
@@ -22,105 +34,75 @@ use ratatui::widgets::{Block, Paragraph, Widget};
 
 use crate::Spin;
 
-// ── Braille constants ─────────────────────────────────────────────────────────
+// ── Braille glyph constants ───────────────────────────────────────────────────
 
-const BRAILLE_BASE: u32 = 0x2800;
-
-/// `BRAILLE_MAP[dot_row % 4][dot_col % 2]` → bit index in the braille byte.
-const BRAILLE_MAP: [[u8; 2]; 4] = [[0, 3], [1, 4], [2, 5], [6, 7]];
-
-// ── Perimeter helper ──────────────────────────────────────────────────────────
-
-/// Build the ordered clockwise perimeter of a `char_w × char_h` terminal
-/// character rectangle in 1:1 braille-dot coordinates.
+/// Fade ramp for arc edges — outermost (index 0) to innermost (index 3).
 ///
-/// Returns `(dot_row, dot_col)` pairs, starting at the top-left corner and
-/// travelling: top → right → bottom → left.
+/// ```text
+/// ⠉  0x09   dots 1,4       — top row only
+/// ⠛  0x1B   dots 1,2,4,5   — top two rows
+/// ⠿  0x3F   dots 1–6       — top three rows
+/// ⣿  0xFF   dots 1–8       — full
+/// ```
+const FADE: [u8; 4] = [0x09, 0x1B, 0x3F, 0xFF];
+
+/// Braille byte for the dim background track.
 ///
-/// Total length = `2 * (char_w * 2 + char_h * 4) - 4`.
-pub(crate) fn build_perimeter(char_w: usize, char_h: usize) -> Vec<(usize, usize)> {
-    let dot_w = char_w * 2;
-    let dot_h = char_h * 4;
-    let capacity = 2 * (dot_w + dot_h) - 4;
-    let mut perim = Vec::with_capacity(capacity);
-
-    // Top edge: left → right
-    for c in 0..dot_w {
-        perim.push((0, c));
-    }
-    // Right edge: row 1 → bottom (top-right corner already included)
-    for r in 1..dot_h {
-        perim.push((r, dot_w - 1));
-    }
-    // Bottom edge: col dot_w-2 → 0 (bottom-right corner already included)
-    for c in (0..dot_w - 1).rev() {
-        perim.push((dot_h - 1, c));
-    }
-    // Left edge: row dot_h-2 → 1 (corners already included)
-    for r in (1..dot_h - 1).rev() {
-        perim.push((r, 0));
-    }
-
-    perim
-}
+/// `⣀` (0xC0) — bottom two dots only — gives a subtle rail behind the arc.
+const DIM_BYTE: u8 = 0xC0;
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 
-/// Internal animation state for one rectangle.
+/// Internal bounce engine operating in **character-column** space.
+///
+/// All positions are whole character columns, so there are never any
+/// sub-character boundary artefacts.
 struct RectEngine {
     char_w: usize,
     char_h: usize,
-    perimeter: Vec<(usize, usize)>,
-    /// Index of the first dot in the bright arc window.
+    /// Width of the bright window in character columns.
+    arc_cols: usize,
+    /// Leftmost character column of the bright window.
     anchor: usize,
-    arc_len: usize,
     going_forward: bool,
 }
 
 impl RectEngine {
-    #[allow(clippy::cast_possible_wrap)]
-    fn build(char_w: usize, char_h: usize, arc_len_override: usize, spin: Spin) -> Self {
+    fn build(char_w: usize, char_h: usize, arc_width: usize, spin: Spin) -> Self {
         let char_w = char_w.max(3);
-        let char_h = char_h.max(2);
-        let perimeter = build_perimeter(char_w, char_h);
-        let n = perimeter.len();
-        let arc_len = if arc_len_override > 0 {
-            arc_len_override.min(n.saturating_sub(1))
+        let char_h = char_h.max(1);
+
+        // Arc width: explicit value, or auto (~⅓ of bar, min 4 so fade shows).
+        let arc_cols = if arc_width > 0 {
+            arc_width.min(char_w.saturating_sub(1))
         } else {
-            (n / 4).max(3)
+            char_w.div_ceil(3).max(4)
         };
 
         let going_forward = matches!(spin, Spin::Clockwise);
         let anchor = if going_forward {
             0
         } else {
-            n.saturating_sub(arc_len)
+            char_w.saturating_sub(arc_cols)
         };
 
         Self {
             char_w,
             char_h,
-            perimeter,
+            arc_cols,
             anchor,
-            arc_len,
             going_forward,
         }
     }
 
-    /// Advance one step, bouncing when the window hits either end.
+    /// Advance one step, reversing at each edge.
     fn walk(&mut self) {
-        let n = self.perimeter.len();
-        if n <= self.arc_len {
-            return;
-        }
-        let max_anchor = n - self.arc_len;
-
+        let max_anchor = self.char_w.saturating_sub(self.arc_cols);
         if self.going_forward {
             if self.anchor < max_anchor {
                 self.anchor += 1;
             } else {
                 self.going_forward = false;
-                // Don't double-step; the next call will go backward.
             }
         } else if self.anchor > 0 {
             self.anchor -= 1;
@@ -129,42 +111,22 @@ impl RectEngine {
         }
     }
 
-    /// Render the current frame as braille [`Line`]s.
+    /// Render the current frame as styled braille [`Line`]s.
     fn render_lines(&self, arc_color: Color, dim_color: Color) -> Vec<Line<'static>> {
-        let mut bright = vec![vec![0u8; self.char_w]; self.char_h];
-        let mut dim = vec![vec![0u8; self.char_w]; self.char_h];
-
-        let arc_end = self.anchor + self.arc_len;
-
-        for (idx, &(dr, dc)) in self.perimeter.iter().enumerate() {
-            let ci = dr / 4;
-            let cj = dc / 2;
-            if ci >= self.char_h || cj >= self.char_w {
-                continue;
-            }
-            let bit = BRAILLE_MAP[dr % 4][dc % 2];
-            if idx >= self.anchor && idx < arc_end {
-                bright[ci][cj] |= 1 << bit;
-            } else {
-                dim[ci][cj] |= 1 << bit;
-            }
-        }
+        let arc_end = self.anchor + self.arc_cols;
 
         (0..self.char_h)
-            .map(|ri| {
+            .map(|_| {
                 let spans: Vec<Span<'static>> = (0..self.char_w)
-                    .map(|cj| {
-                        let b = bright[ri][cj];
-                        let d = dim[ri][cj];
-                        let (byte, color) = if b != 0 {
-                            (b, arc_color)
-                        } else if d != 0 {
-                            (d, dim_color)
+                    .map(|ci| {
+                        let (byte, color) = if ci >= self.anchor && ci < arc_end {
+                            // Distance from the nearer arc edge → fade index (0–3).
+                            let dist = (ci - self.anchor).min(arc_end - 1 - ci).min(3);
+                            (FADE[dist], arc_color)
                         } else {
-                            (0u8, dim_color)
+                            (DIM_BYTE, dim_color)
                         };
-                        let ch =
-                            char::from_u32(BRAILLE_BASE + u32::from(byte)).unwrap_or('\u{2800}');
+                        let ch = char::from_u32(0x2800 + u32::from(byte)).unwrap_or('\u{2800}');
                         Span::styled(ch.to_string(), Style::default().fg(color))
                     })
                     .collect();
@@ -176,16 +138,19 @@ impl RectEngine {
 
 // ── Public widget ─────────────────────────────────────────────────────────────
 
-/// A Zed / Claude-style braille-dot arc that **bounces** around the perimeter
-/// of a rectangle.
+/// A Zed / Claude-style braille loading bar that **bounces** left and right.
 ///
-/// Unlike [`crate::RectSpinner`] and [`crate::CircleSpinner`] which rotate
-/// continuously, this spinner reverses direction at each end of the perimeter,
-/// producing a back-and-forth ping-pong animation.
+/// Every character cell in the bar is a braille glyph.  A bright arc window
+/// slides across and reverses at each end; the arc edges fade through a
+/// density ramp (`⠉ ⠛ ⠿ ⣿`) for a soft comet-glow look.  The dim
+/// background uses `⣀` (a two-dot rail) so the full bar extent is visible
+/// without competing with the arc.
 ///
-/// # Layout
+/// # Width
 ///
-/// The rendered size is exactly `width × height` terminal character cells.
+/// Leave [`width`](RectangularSpinner::width) at its default **`0`** to fill
+/// the available area automatically (most common usage).  Set it to a fixed
+/// positive value if you need a predetermined size.
 ///
 /// # Examples
 ///
@@ -196,11 +161,9 @@ impl RectEngine {
 /// use tui_spinner::{RectangularSpinner, Spin};
 ///
 /// fn draw(frame: &mut Frame, area: Rect, tick: u64) {
+///     // Fills the full width of `area` — typical Zed/Claude style.
 ///     frame.render_widget(
 ///         RectangularSpinner::new(tick)
-///             .width(10)
-///             .height(3)
-///             .spin(Spin::Clockwise)
 ///             .arc_color(Color::Cyan)
 ///             .dim_color(Color::DarkGray),
 ///         area,
@@ -210,19 +173,19 @@ impl RectEngine {
 #[derive(Debug, Clone)]
 pub struct RectangularSpinner<'a> {
     tick: u64,
-    /// Width in terminal character columns (minimum 3).
+    /// `0` = fill available area; positive = fixed column count.
     width: usize,
-    /// Height in terminal character rows (minimum 2).
+    /// Height in character rows (minimum 1).
     height: usize,
-    /// Explicit arc length in perimeter dots (0 = auto ~¼ of perimeter).
-    arc_len: usize,
+    /// Explicit arc width in character columns (`0` = auto ~⅓ of bar).
+    arc_width: usize,
     /// Starting direction before the first bounce.
     spin: Spin,
     /// Ticks held per animation step (higher = slower).
     ticks_per_step: u64,
-    /// Colour of the bright arc segment.
+    /// Colour of the bright arc glyph.
     arc_color: Color,
-    /// Colour of the dim background ring.
+    /// Colour of the dim background track glyph.
     dim_color: Color,
     block: Option<Block<'a>>,
     style: Style,
@@ -231,8 +194,8 @@ pub struct RectangularSpinner<'a> {
 
 impl<'a> RectangularSpinner<'a> {
     /// Creates a new [`RectangularSpinner`] with defaults:
-    /// `8 × 3` characters, clockwise start, cyan arc, dark-gray ring,
-    /// 1 tick per step, auto arc length.
+    /// auto-width, 1-row height, clockwise start, cyan arc, dark-gray track,
+    /// 1 tick per step, auto arc width.
     ///
     /// # Examples
     ///
@@ -245,9 +208,9 @@ impl<'a> RectangularSpinner<'a> {
     pub fn new(tick: u64) -> Self {
         Self {
             tick,
-            width: 8,
-            height: 3,
-            arc_len: 0,
+            width: 0,
+            height: 1,
+            arc_width: 0,
             spin: Spin::Clockwise,
             ticks_per_step: 1,
             arc_color: Color::Cyan,
@@ -258,59 +221,68 @@ impl<'a> RectangularSpinner<'a> {
         }
     }
 
-    /// Sets the width in terminal character columns (minimum 3).
+    /// Sets the fixed width in character columns.
+    ///
+    /// Pass **`0`** (the default) to fill the available area width
+    /// automatically.
     ///
     /// # Examples
     ///
     /// ```
     /// use tui_spinner::RectangularSpinner;
     ///
-    /// let wide = RectangularSpinner::new(0).width(16);
+    /// let fixed = RectangularSpinner::new(0).width(24);
+    /// let auto  = RectangularSpinner::new(0).width(0); // fills area
     /// ```
     #[must_use]
     pub fn width(mut self, w: usize) -> Self {
-        self.width = w.max(3);
+        self.width = w;
         self
     }
 
-    /// Sets the height in terminal character rows (minimum 2).
+    /// Sets the height in character rows (minimum 1, default 1).
+    ///
+    /// Use `1` for a thin Zed-style bar or `2`–`3` for a thicker
+    /// Claude-style block.
     ///
     /// # Examples
     ///
     /// ```
     /// use tui_spinner::RectangularSpinner;
     ///
-    /// let tall = RectangularSpinner::new(0).height(4);
+    /// let thick = RectangularSpinner::new(0).height(2);
     /// ```
     #[must_use]
     pub fn height(mut self, h: usize) -> Self {
-        self.height = h.max(2);
+        self.height = h.max(1);
         self
     }
 
-    /// Sets the arc length in perimeter dots (0 = auto, defaults to ~¼ perimeter).
+    /// Sets the arc width in character columns (`0` = auto ~⅓ of bar).
     ///
     /// # Examples
     ///
     /// ```
     /// use tui_spinner::RectangularSpinner;
     ///
-    /// let long_arc = RectangularSpinner::new(0).arc_len(20);
+    /// let narrow = RectangularSpinner::new(0).arc_width(6);
+    /// let wide   = RectangularSpinner::new(0).arc_width(20);
     /// ```
     #[must_use]
-    pub fn arc_len(mut self, len: usize) -> Self {
-        self.arc_len = len;
+    pub fn arc_width(mut self, w: usize) -> Self {
+        self.arc_width = w;
         self
     }
 
-    /// Sets the starting direction before the first bounce (default: [`Spin::Clockwise`]).
+    /// Sets the starting direction before the first bounce
+    /// (default: [`Spin::Clockwise`] = starts moving right).
     ///
     /// # Examples
     ///
     /// ```
     /// use tui_spinner::{RectangularSpinner, Spin};
     ///
-    /// let ccw = RectangularSpinner::new(0).spin(Spin::CounterClockwise);
+    /// let rtl = RectangularSpinner::new(0).spin(Spin::CounterClockwise);
     /// ```
     #[must_use]
     pub const fn spin(mut self, spin: Spin) -> Self {
@@ -318,7 +290,7 @@ impl<'a> RectangularSpinner<'a> {
         self
     }
 
-    /// Sets how many ticks each position is held (default: 1; higher = slower).
+    /// Sets how many ticks each arc position is held (default 1; higher = slower).
     ///
     /// # Examples
     ///
@@ -333,7 +305,7 @@ impl<'a> RectangularSpinner<'a> {
         self
     }
 
-    /// Sets the colour of the bright arc segment (default: [`Color::Cyan`]).
+    /// Sets the colour of the bright arc glyph (default: [`Color::Cyan`]).
     ///
     /// # Examples
     ///
@@ -349,7 +321,10 @@ impl<'a> RectangularSpinner<'a> {
         self
     }
 
-    /// Sets the colour of the dim background ring (default: [`Color::DarkGray`]).
+    /// Sets the colour of the dim background track (default: [`Color::DarkGray`]).
+    ///
+    /// Set to the terminal background colour (e.g. [`Color::Black`]) to hide
+    /// the track so only the glowing arc is visible.
     ///
     /// # Examples
     ///
@@ -357,7 +332,10 @@ impl<'a> RectangularSpinner<'a> {
     /// use ratatui::style::Color;
     /// use tui_spinner::RectangularSpinner;
     ///
-    /// let spinner = RectangularSpinner::new(0).dim_color(Color::Black);
+    /// // Visible track
+    /// let with_track    = RectangularSpinner::new(0).dim_color(Color::DarkGray);
+    /// // Arc floats on empty space
+    /// let no_track      = RectangularSpinner::new(0).dim_color(Color::Black);
     /// ```
     #[must_use]
     pub const fn dim_color(mut self, color: Color) -> Self {
@@ -389,33 +367,39 @@ impl<'a> RectangularSpinner<'a> {
         self
     }
 
-    /// Sets the horizontal alignment of the rendered spinner (default: left).
+    /// Sets the horizontal alignment of the rendered output (default: left).
     #[must_use]
     pub const fn alignment(mut self, alignment: Alignment) -> Self {
         self.alignment = alignment;
         self
     }
 
-    /// Returns the rendered size in terminal characters `(cols, rows)`.
-    ///
-    /// This always equals `(width, height)` after clamping to the minimums.
+    /// Returns the explicit rendered size `(cols, rows)`, or `None` when the
+    /// width is set to auto (`0`).
     ///
     /// # Examples
     ///
     /// ```
     /// use tui_spinner::RectangularSpinner;
     ///
-    /// let (cols, rows) = RectangularSpinner::new(0).width(10).height(4).char_size();
-    /// assert_eq!(cols, 10);
-    /// assert_eq!(rows, 4);
+    /// assert_eq!(
+    ///     RectangularSpinner::new(0).width(20).height(2).char_size(),
+    ///     Some((20, 2))
+    /// );
+    /// assert_eq!(RectangularSpinner::new(0).char_size(), None);
     /// ```
     #[must_use]
-    pub fn char_size(&self) -> (usize, usize) {
-        (self.width.max(3), self.height.max(2))
+    pub fn char_size(&self) -> Option<(usize, usize)> {
+        if self.width == 0 {
+            None
+        } else {
+            Some((self.width.max(3), self.height.max(1)))
+        }
     }
 
-    fn build_lines(&self) -> Vec<Line<'static>> {
-        let mut engine = RectEngine::build(self.width, self.height, self.arc_len, self.spin);
+    fn build_lines(&self, actual_width: usize) -> Vec<Line<'static>> {
+        let w = actual_width.max(3);
+        let mut engine = RectEngine::build(w, self.height, self.arc_width, self.spin);
 
         #[allow(clippy::cast_possible_truncation)]
         let steps = (self.tick / self.ticks_per_step) as usize;
@@ -466,7 +450,14 @@ impl Widget for &RectangularSpinner<'_> {
             return;
         }
 
-        let lines = self.build_lines();
+        // Resolve width: explicit fixed value, or fill available area.
+        let actual_width = if self.width == 0 {
+            inner_area.width as usize
+        } else {
+            self.width
+        };
+
+        let lines = self.build_lines(actual_width);
         Paragraph::new(lines)
             .alignment(self.alignment)
             .render(inner_area, buf);
@@ -480,59 +471,12 @@ mod tests {
     use super::*;
     use ratatui::{backend::TestBackend, Terminal};
 
-    // ── Perimeter geometry ────────────────────────────────────────────────────
-
-    #[test]
-    fn perimeter_length_formula() {
-        // Total = 2*(2w + 4h) - 4
-        for w in 3..=8usize {
-            for h in 2..=6usize {
-                let got = build_perimeter(w, h).len();
-                let expected = 2 * (w * 2 + h * 4) - 4;
-                assert_eq!(got, expected, "w={w} h={h}");
-            }
-        }
-    }
-
-    #[test]
-    fn perimeter_no_duplicate_dots() {
-        use std::collections::HashSet;
-        for w in 3..=6usize {
-            for h in 2..=4usize {
-                let p = build_perimeter(w, h);
-                let unique: HashSet<_> = p.iter().copied().collect();
-                assert_eq!(unique.len(), p.len(), "duplicate dots w={w} h={h}");
-            }
-        }
-    }
-
-    #[test]
-    fn perimeter_starts_at_top_left() {
-        let p = build_perimeter(4, 2);
-        assert_eq!(p[0], (0, 0), "first dot should be top-left (0,0)");
-    }
-
-    #[test]
-    fn perimeter_all_dots_on_border() {
-        for w in 3..=6usize {
-            for h in 2..=4usize {
-                let dot_w = w * 2;
-                let dot_h = h * 4;
-                let p = build_perimeter(w, h);
-                for &(r, c) in &p {
-                    let on_border = r == 0 || r == dot_h - 1 || c == 0 || c == dot_w - 1;
-                    assert!(on_border, "dot ({r},{c}) is not on border w={w} h={h}");
-                }
-            }
-        }
-    }
-
-    // ── Engine ────────────────────────────────────────────────────────────────
+    // ── Engine: construction ──────────────────────────────────────────────────
 
     #[test]
     fn engine_builds_without_panic() {
-        for w in 3..=8usize {
-            for h in 2..=5usize {
+        for w in 3..=30usize {
+            for h in 1..=5usize {
                 for spin in [Spin::Clockwise, Spin::CounterClockwise] {
                     let _ = RectEngine::build(w, h, 0, spin);
                 }
@@ -542,21 +486,21 @@ mod tests {
 
     #[test]
     fn engine_walk_does_not_panic() {
-        let mut e = RectEngine::build(6, 3, 0, Spin::Clockwise);
-        for _ in 0..500 {
+        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise);
+        for _ in 0..1000 {
             e.walk();
         }
     }
 
     #[test]
     fn engine_anchor_stays_in_bounds() {
-        let mut e = RectEngine::build(6, 3, 0, Spin::Clockwise);
-        let max_anchor = e.perimeter.len().saturating_sub(e.arc_len);
+        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise);
+        let max_anchor = e.char_w.saturating_sub(e.arc_cols);
         for _ in 0..500 {
             e.walk();
             assert!(
                 e.anchor <= max_anchor,
-                "anchor={} max={max_anchor}",
+                "anchor={} exceeds max={max_anchor}",
                 e.anchor
             );
         }
@@ -564,81 +508,185 @@ mod tests {
 
     #[test]
     fn engine_bounces_direction() {
-        let mut e = RectEngine::build(6, 3, 0, Spin::Clockwise);
-        assert!(e.going_forward, "should start going forward");
+        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise);
+        assert!(e.going_forward, "should start going forward (CW)");
 
-        // Walk until direction reverses.
-        let max_steps = e.perimeter.len() * 2;
+        // Walk until direction reverses to backward.
         let mut reversed = false;
-        for _ in 0..max_steps {
+        for _ in 0..100 {
             e.walk();
             if !e.going_forward {
                 reversed = true;
                 break;
             }
         }
-        assert!(reversed, "engine never reversed direction");
+        assert!(reversed, "engine never reversed to backward");
 
-        // Walk until it reverses back.
+        // Walk until it reverses back to forward.
         let mut re_reversed = false;
-        for _ in 0..max_steps {
+        for _ in 0..100 {
             e.walk();
             if e.going_forward {
                 re_reversed = true;
                 break;
             }
         }
-        assert!(re_reversed, "engine never reversed back");
+        assert!(re_reversed, "engine never reversed back to forward");
     }
 
     #[test]
-    fn cw_and_ccw_start_differ() {
-        let cw = RectEngine::build(6, 3, 0, Spin::Clockwise);
-        let ccw = RectEngine::build(6, 3, 0, Spin::CounterClockwise);
-        assert_ne!(
-            cw.anchor, ccw.anchor,
-            "CW and CCW should start at different anchors"
+    fn cw_starts_at_left_ccw_at_right() {
+        let cw = RectEngine::build(20, 1, 0, Spin::Clockwise);
+        let ccw = RectEngine::build(20, 1, 0, Spin::CounterClockwise);
+        assert_eq!(cw.anchor, 0, "CW should start at column 0");
+        assert!(
+            ccw.anchor > 0,
+            "CCW should start at the right (anchor={})",
+            ccw.anchor
         );
-        assert_ne!(
-            cw.going_forward, ccw.going_forward,
-            "CW and CCW should start with opposite directions"
+        assert!(cw.going_forward);
+        assert!(!ccw.going_forward);
+    }
+
+    // ── Fade ramp ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn arc_edges_use_fade_bytes() {
+        // Build a wide engine so there is a full-density centre.
+        let e = RectEngine::build(20, 1, 12, Spin::Clockwise);
+        let lines = e.render_lines(Color::Cyan, Color::DarkGray);
+        assert_eq!(lines.len(), 1);
+        let spans = &lines[0].spans;
+
+        // The outermost arc column (index anchor+0) should be FADE[0] = 0x09.
+        let outer = char::from_u32(0x2800 + u32::from(FADE[0])).unwrap();
+        assert_eq!(
+            spans[e.anchor].content.chars().next(),
+            Some(outer),
+            "outermost arc edge should be FADE[0]"
         );
+
+        // The centre arc column (index anchor + arc_cols/2) should be FADE[3] = 0xFF.
+        let centre_idx = e.anchor + e.arc_cols / 2;
+        let full = char::from_u32(0x2800 + u32::from(FADE[3])).unwrap();
+        assert_eq!(
+            spans[centre_idx].content.chars().next(),
+            Some(full),
+            "arc centre should be full density FADE[3]"
+        );
+    }
+
+    #[test]
+    fn dim_columns_use_dim_byte() {
+        let e = RectEngine::build(20, 1, 6, Spin::Clockwise);
+        let lines = e.render_lines(Color::Cyan, Color::DarkGray);
+        let spans = &lines[0].spans;
+        let dim_char = char::from_u32(0x2800 + u32::from(DIM_BYTE)).unwrap();
+        // Columns before the arc anchor should all be DIM_BYTE.
+        for i in 0..e.anchor {
+            assert_eq!(
+                spans[i].content.chars().next(),
+                Some(dim_char),
+                "column {i} should be dim"
+            );
+        }
+    }
+
+    // ── Widget output ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn build_lines_height_matches() {
+        for h in 1..=5usize {
+            let lines = RectangularSpinner::new(0)
+                .width(20)
+                .height(h)
+                .build_lines(20);
+            assert_eq!(lines.len(), h, "height={h}");
+        }
+    }
+
+    #[test]
+    fn build_lines_width_matches() {
+        let w = 24usize;
+        let lines = RectangularSpinner::new(0).width(w).height(1).build_lines(w);
+        assert_eq!(lines[0].spans.len(), w, "each line should have {w} spans");
     }
 
     #[test]
     fn different_ticks_produce_different_output() {
-        let lines_a = RectangularSpinner::new(0).width(8).height(3).build_lines();
-        let lines_b = RectangularSpinner::new(10).width(8).height(3).build_lines();
-        assert_ne!(lines_a, lines_b, "tick=0 and tick=10 should differ");
+        let a = RectangularSpinner::new(0)
+            .width(20)
+            .height(1)
+            .build_lines(20);
+        let b = RectangularSpinner::new(8)
+            .width(20)
+            .height(1)
+            .build_lines(20);
+        assert_ne!(a, b, "tick=0 and tick=8 should differ");
     }
 
     #[test]
-    fn cw_and_ccw_widgets_differ_at_tick_5() {
+    fn cw_and_ccw_differ_at_same_tick() {
         let cw = RectangularSpinner::new(5)
-            .width(8)
-            .height(3)
+            .width(20)
+            .height(1)
             .spin(Spin::Clockwise)
-            .build_lines();
+            .build_lines(20);
         let ccw = RectangularSpinner::new(5)
-            .width(8)
-            .height(3)
+            .width(20)
+            .height(1)
             .spin(Spin::CounterClockwise)
-            .build_lines();
+            .build_lines(20);
+        assert_ne!(cw, ccw, "CW and CCW should differ at the same tick");
+    }
+
+    #[test]
+    fn ticks_per_step_slows_animation() {
+        let fast = RectangularSpinner::new(10)
+            .width(20)
+            .height(1)
+            .ticks_per_step(1)
+            .build_lines(20);
+        let slow = RectangularSpinner::new(10)
+            .width(20)
+            .height(1)
+            .ticks_per_step(5)
+            .build_lines(20);
         assert_ne!(
-            cw, ccw,
-            "CW and CCW widgets should produce different output at tick 5"
+            fast, slow,
+            "different speeds should produce different output"
         );
+    }
+
+    #[test]
+    fn arc_width_override_respected() {
+        let e = RectEngine::build(20, 1, 7, Spin::Clockwise);
+        assert_eq!(e.arc_cols, 7);
     }
 
     // ── Widget rendering ──────────────────────────────────────────────────────
 
     #[test]
     fn widget_renders_without_panic() {
-        let backend = TestBackend::new(20, 6);
+        let backend = TestBackend::new(40, 3);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
-                frame.render_widget(RectangularSpinner::new(42).width(8).height(3), frame.area());
+                frame.render_widget(RectangularSpinner::new(42), frame.area());
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn widget_fixed_width_renders_without_panic() {
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                frame.render_widget(
+                    RectangularSpinner::new(42).width(24).height(2),
+                    frame.area(),
+                );
             })
             .unwrap();
     }
@@ -655,70 +703,47 @@ mod tests {
     }
 
     #[test]
-    fn char_size_is_correct() {
-        let s = RectangularSpinner::new(0).width(10).height(4);
-        assert_eq!(s.char_size(), (10, 4));
+    fn char_size_fixed_width() {
+        let s = RectangularSpinner::new(0).width(20).height(2);
+        assert_eq!(s.char_size(), Some((20, 2)));
+    }
+
+    #[test]
+    fn char_size_auto_width_is_none() {
+        let s = RectangularSpinner::new(0); // width = 0 = auto
+        assert_eq!(s.char_size(), None);
     }
 
     #[test]
     fn char_size_clamps_minimum() {
-        let s = RectangularSpinner::new(0).width(1).height(1);
-        let (w, h) = s.char_size();
-        assert!(w >= 3, "width should be at least 3");
-        assert!(h >= 2, "height should be at least 2");
-    }
-
-    #[test]
-    fn rendered_output_has_braille_chars() {
-        let lines = RectangularSpinner::new(0).width(8).height(3).build_lines();
-        assert_eq!(lines.len(), 3, "should produce 3 lines for height=3");
-        for line in &lines {
-            assert!(!line.spans.is_empty(), "line has no spans");
+        let s = RectangularSpinner::new(0).width(1).height(0);
+        if let Some((w, h)) = s.char_size() {
+            assert!(w >= 3, "width clamped to at least 3");
+            assert!(h >= 1, "height clamped to at least 1");
         }
     }
 
+    // ── Builder chain ─────────────────────────────────────────────────────────
+
     #[test]
     fn builder_chain() {
-        use ratatui::style::Color;
         use ratatui::widgets::Block;
         let s = RectangularSpinner::new(0)
-            .width(12)
-            .height(4)
-            .arc_len(10)
+            .width(24)
+            .height(2)
+            .arc_width(8)
             .spin(Spin::CounterClockwise)
-            .ticks_per_step(2)
+            .ticks_per_step(3)
             .arc_color(Color::Blue)
             .dim_color(Color::Black)
             .block(Block::bordered())
             .alignment(Alignment::Center);
-        assert_eq!(s.width, 12);
-        assert_eq!(s.height, 4);
-        assert_eq!(s.arc_len, 10);
+        assert_eq!(s.width, 24);
+        assert_eq!(s.height, 2);
+        assert_eq!(s.arc_width, 8);
         assert!(matches!(s.spin, Spin::CounterClockwise));
-        assert_eq!(s.ticks_per_step, 2);
-    }
-
-    #[test]
-    fn arc_len_override_respected() {
-        let e = RectEngine::build(8, 3, 15, Spin::Clockwise);
-        assert_eq!(e.arc_len, 15);
-    }
-
-    #[test]
-    fn ticks_per_step_slows_animation() {
-        let fast = RectangularSpinner::new(10)
-            .width(8)
-            .height(3)
-            .ticks_per_step(1)
-            .build_lines();
-        let slow = RectangularSpinner::new(10)
-            .width(8)
-            .height(3)
-            .ticks_per_step(5)
-            .build_lines();
-        assert_ne!(
-            fast, slow,
-            "different ticks_per_step should produce different output at tick=10"
-        );
+        assert_eq!(s.ticks_per_step, 3);
+        assert_eq!(s.arc_color, Color::Blue);
+        assert_eq!(s.dim_color, Color::Black);
     }
 }
