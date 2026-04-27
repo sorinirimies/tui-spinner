@@ -1,6 +1,6 @@
-//! # RectangularSpinner Example
+//! # BarSpinner Example
 //!
-//! Demonstrates the [`RectangularSpinner`] widget — a Zed / Claude-style
+//! Demonstrates the [`BarSpinner`] widget — a Zed / Claude-style
 //! braille loading bar where a glowing arc bounces left and right.
 //!
 //! Every row spans the **full column width** so the animation looks exactly
@@ -17,7 +17,7 @@
 //! **Controls:**
 //! - `q` / `Esc` — Quit
 //!
-//! Run with: `cargo run --example rectangular_spinner`
+//! Run with: `cargo run --example bar_spinner`
 
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode};
@@ -29,7 +29,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
-use tui_spinner::{RectangularSpinner, Spin};
+use tui_spinner::{BarSpinner, Spin};
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ fn render(frame: &mut Frame, app: &App) {
 
 fn render_header(frame: &mut Frame, area: Rect) {
     let block = Block::bordered()
-        .title(" RectangularSpinner — Zed / Claude-style bouncing bar ")
+        .title(" BarSpinner — Zed / Claude-style bouncing bar ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(Color::Cyan));
@@ -458,7 +458,7 @@ fn render_arc_section(frame: &mut Frame, area: Rect, tick: u64) {
             Layout::horizontal([Constraint::Min(4), Constraint::Length(label_w)]).areas(row);
 
         frame.render_widget(
-            RectangularSpinner::new(tick)
+            BarSpinner::new(tick)
                 .arc_width(arc_w)
                 .height(1)
                 .spin(Spin::Clockwise)
@@ -498,7 +498,7 @@ fn render_bar_row(
         Layout::horizontal([Constraint::Length(spinner_w), Constraint::Length(label_w)]).areas(row);
 
     frame.render_widget(
-        RectangularSpinner::new(tick)
+        BarSpinner::new(tick)
             .height(height)
             // width = 0 → fill spinner_area automatically
             .spin(spin)

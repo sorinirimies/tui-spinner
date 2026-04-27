@@ -39,6 +39,14 @@ path = "src/lib.rs"
 name = "spinner"
 path = "examples/spinner.rs"
 
+[[example]]
+name = "bar_spinner"
+path = "examples/bar_spinner.rs"
+
+[[example]]
+name = "zed_spinner"
+path = "examples/zed_spinner.rs"
+
 [profile.release]
 opt-level = 3
 lto = true

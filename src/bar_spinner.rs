@@ -5,7 +5,7 @@
 //! a dimmer background track.  The arc edges taper through a braille density
 //! ramp so the animation looks like a soft glowing comet.
 //!
-//! Set [`RectangularSpinner::width`] to `0` (the default) to fill the
+//! Set [`BarSpinner::width`] to `0` (the default) to fill the
 //! available terminal width automatically.
 //!
 //! ## Visual
@@ -148,7 +148,7 @@ impl RectEngine {
 ///
 /// # Width
 ///
-/// Leave [`width`](RectangularSpinner::width) at its default **`0`** to fill
+/// Leave [`width`](BarSpinner::width) at its default **`0`** to fill
 /// the available area automatically (most common usage).  Set it to a fixed
 /// positive value if you need a predetermined size.
 ///
@@ -158,12 +158,12 @@ impl RectEngine {
 /// use ratatui::style::Color;
 /// use ratatui::Frame;
 /// use ratatui::layout::Rect;
-/// use tui_spinner::{RectangularSpinner, Spin};
+/// use tui_spinner::{BarSpinner, Spin};
 ///
 /// fn draw(frame: &mut Frame, area: Rect, tick: u64) {
 ///     // Fills the full width of `area` — typical Zed/Claude style.
 ///     frame.render_widget(
-///         RectangularSpinner::new(tick)
+///         BarSpinner::new(tick)
 ///             .arc_color(Color::Cyan)
 ///             .dim_color(Color::DarkGray),
 ///         area,
@@ -171,7 +171,7 @@ impl RectEngine {
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct RectangularSpinner<'a> {
+pub struct BarSpinner<'a> {
     tick: u64,
     /// `0` = fill available area; positive = fixed column count.
     width: usize,
@@ -192,17 +192,17 @@ pub struct RectangularSpinner<'a> {
     alignment: Alignment,
 }
 
-impl<'a> RectangularSpinner<'a> {
-    /// Creates a new [`RectangularSpinner`] with defaults:
+impl<'a> BarSpinner<'a> {
+    /// Creates a new [`BarSpinner`] with defaults:
     /// auto-width, 1-row height, clockwise start, cyan arc, dark-gray track,
     /// 1 tick per step, auto arc width.
     ///
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
-    /// let spinner = RectangularSpinner::new(42);
+    /// let spinner = BarSpinner::new(42);
     /// ```
     #[must_use]
     pub fn new(tick: u64) -> Self {
@@ -229,10 +229,10 @@ impl<'a> RectangularSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
-    /// let fixed = RectangularSpinner::new(0).width(24);
-    /// let auto  = RectangularSpinner::new(0).width(0); // fills area
+    /// let fixed = BarSpinner::new(0).width(24);
+    /// let auto  = BarSpinner::new(0).width(0); // fills area
     /// ```
     #[must_use]
     pub fn width(mut self, w: usize) -> Self {
@@ -248,9 +248,9 @@ impl<'a> RectangularSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
-    /// let thick = RectangularSpinner::new(0).height(2);
+    /// let thick = BarSpinner::new(0).height(2);
     /// ```
     #[must_use]
     pub fn height(mut self, h: usize) -> Self {
@@ -263,10 +263,10 @@ impl<'a> RectangularSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
-    /// let narrow = RectangularSpinner::new(0).arc_width(6);
-    /// let wide   = RectangularSpinner::new(0).arc_width(20);
+    /// let narrow = BarSpinner::new(0).arc_width(6);
+    /// let wide   = BarSpinner::new(0).arc_width(20);
     /// ```
     #[must_use]
     pub fn arc_width(mut self, w: usize) -> Self {
@@ -280,9 +280,9 @@ impl<'a> RectangularSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::{RectangularSpinner, Spin};
+    /// use tui_spinner::{BarSpinner, Spin};
     ///
-    /// let rtl = RectangularSpinner::new(0).spin(Spin::CounterClockwise);
+    /// let rtl = BarSpinner::new(0).spin(Spin::CounterClockwise);
     /// ```
     #[must_use]
     pub const fn spin(mut self, spin: Spin) -> Self {
@@ -295,9 +295,9 @@ impl<'a> RectangularSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
-    /// let slow = RectangularSpinner::new(0).ticks_per_step(3);
+    /// let slow = BarSpinner::new(0).ticks_per_step(3);
     /// ```
     #[must_use]
     pub fn ticks_per_step(mut self, n: u64) -> Self {
@@ -311,9 +311,9 @@ impl<'a> RectangularSpinner<'a> {
     ///
     /// ```
     /// use ratatui::style::Color;
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
-    /// let spinner = RectangularSpinner::new(0).arc_color(Color::LightBlue);
+    /// let spinner = BarSpinner::new(0).arc_color(Color::LightBlue);
     /// ```
     #[must_use]
     pub const fn arc_color(mut self, color: Color) -> Self {
@@ -330,12 +330,12 @@ impl<'a> RectangularSpinner<'a> {
     ///
     /// ```
     /// use ratatui::style::Color;
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
     /// // Visible track
-    /// let with_track    = RectangularSpinner::new(0).dim_color(Color::DarkGray);
+    /// let with_track    = BarSpinner::new(0).dim_color(Color::DarkGray);
     /// // Arc floats on empty space
-    /// let no_track      = RectangularSpinner::new(0).dim_color(Color::Black);
+    /// let no_track      = BarSpinner::new(0).dim_color(Color::Black);
     /// ```
     #[must_use]
     pub const fn dim_color(mut self, color: Color) -> Self {
@@ -349,9 +349,9 @@ impl<'a> RectangularSpinner<'a> {
     ///
     /// ```
     /// use ratatui::widgets::Block;
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
-    /// let spinner = RectangularSpinner::new(0)
+    /// let spinner = BarSpinner::new(0)
     ///     .block(Block::bordered().title("Loading…"));
     /// ```
     #[must_use]
@@ -380,13 +380,13 @@ impl<'a> RectangularSpinner<'a> {
     /// # Examples
     ///
     /// ```
-    /// use tui_spinner::RectangularSpinner;
+    /// use tui_spinner::BarSpinner;
     ///
     /// assert_eq!(
-    ///     RectangularSpinner::new(0).width(20).height(2).char_size(),
+    ///     BarSpinner::new(0).width(20).height(2).char_size(),
     ///     Some((20, 2))
     /// );
-    /// assert_eq!(RectangularSpinner::new(0).char_size(), None);
+    /// assert_eq!(BarSpinner::new(0).char_size(), None);
     /// ```
     #[must_use]
     pub fn char_size(&self) -> Option<(usize, usize)> {
@@ -413,7 +413,7 @@ impl<'a> RectangularSpinner<'a> {
 
 // ── Trait impls ───────────────────────────────────────────────────────────────
 
-impl Styled for RectangularSpinner<'_> {
+impl Styled for BarSpinner<'_> {
     type Item = Self;
 
     fn style(&self) -> Style {
@@ -426,13 +426,13 @@ impl Styled for RectangularSpinner<'_> {
     }
 }
 
-impl Widget for RectangularSpinner<'_> {
+impl Widget for BarSpinner<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         Widget::render(&self, area, buf);
     }
 }
 
-impl Widget for &RectangularSpinner<'_> {
+impl Widget for &BarSpinner<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.area() == 0 {
             return;
@@ -597,10 +597,7 @@ mod tests {
     #[test]
     fn build_lines_height_matches() {
         for h in 1..=5usize {
-            let lines = RectangularSpinner::new(0)
-                .width(20)
-                .height(h)
-                .build_lines(20);
+            let lines = BarSpinner::new(0).width(20).height(h).build_lines(20);
             assert_eq!(lines.len(), h, "height={h}");
         }
     }
@@ -608,31 +605,25 @@ mod tests {
     #[test]
     fn build_lines_width_matches() {
         let w = 24usize;
-        let lines = RectangularSpinner::new(0).width(w).height(1).build_lines(w);
+        let lines = BarSpinner::new(0).width(w).height(1).build_lines(w);
         assert_eq!(lines[0].spans.len(), w, "each line should have {w} spans");
     }
 
     #[test]
     fn different_ticks_produce_different_output() {
-        let a = RectangularSpinner::new(0)
-            .width(20)
-            .height(1)
-            .build_lines(20);
-        let b = RectangularSpinner::new(8)
-            .width(20)
-            .height(1)
-            .build_lines(20);
+        let a = BarSpinner::new(0).width(20).height(1).build_lines(20);
+        let b = BarSpinner::new(8).width(20).height(1).build_lines(20);
         assert_ne!(a, b, "tick=0 and tick=8 should differ");
     }
 
     #[test]
     fn cw_and_ccw_differ_at_same_tick() {
-        let cw = RectangularSpinner::new(5)
+        let cw = BarSpinner::new(5)
             .width(20)
             .height(1)
             .spin(Spin::Clockwise)
             .build_lines(20);
-        let ccw = RectangularSpinner::new(5)
+        let ccw = BarSpinner::new(5)
             .width(20)
             .height(1)
             .spin(Spin::CounterClockwise)
@@ -642,12 +633,12 @@ mod tests {
 
     #[test]
     fn ticks_per_step_slows_animation() {
-        let fast = RectangularSpinner::new(10)
+        let fast = BarSpinner::new(10)
             .width(20)
             .height(1)
             .ticks_per_step(1)
             .build_lines(20);
-        let slow = RectangularSpinner::new(10)
+        let slow = BarSpinner::new(10)
             .width(20)
             .height(1)
             .ticks_per_step(5)
@@ -672,7 +663,7 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
-                frame.render_widget(RectangularSpinner::new(42), frame.area());
+                frame.render_widget(BarSpinner::new(42), frame.area());
             })
             .unwrap();
     }
@@ -683,10 +674,7 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
-                frame.render_widget(
-                    RectangularSpinner::new(42).width(24).height(2),
-                    frame.area(),
-                );
+                frame.render_widget(BarSpinner::new(42).width(24).height(2), frame.area());
             })
             .unwrap();
     }
@@ -697,26 +685,26 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
-                frame.render_widget(RectangularSpinner::new(0), frame.area());
+                frame.render_widget(BarSpinner::new(0), frame.area());
             })
             .unwrap();
     }
 
     #[test]
     fn char_size_fixed_width() {
-        let s = RectangularSpinner::new(0).width(20).height(2);
+        let s = BarSpinner::new(0).width(20).height(2);
         assert_eq!(s.char_size(), Some((20, 2)));
     }
 
     #[test]
     fn char_size_auto_width_is_none() {
-        let s = RectangularSpinner::new(0); // width = 0 = auto
+        let s = BarSpinner::new(0); // width = 0 = auto
         assert_eq!(s.char_size(), None);
     }
 
     #[test]
     fn char_size_clamps_minimum() {
-        let s = RectangularSpinner::new(0).width(1).height(0);
+        let s = BarSpinner::new(0).width(1).height(0);
         if let Some((w, h)) = s.char_size() {
             assert!(w >= 3, "width clamped to at least 3");
             assert!(h >= 1, "height clamped to at least 1");
@@ -728,7 +716,7 @@ mod tests {
     #[test]
     fn builder_chain() {
         use ratatui::widgets::Block;
-        let s = RectangularSpinner::new(0)
+        let s = BarSpinner::new(0)
             .width(24)
             .height(2)
             .arc_width(8)

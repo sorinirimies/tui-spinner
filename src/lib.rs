@@ -42,7 +42,7 @@
 //!
 //!   Configured with `.radius(n)`, `.spin()`, `.arc_color()`, and `.dim_color()`.
 //!
-//! - **[`RectangularSpinner`]** — A Zed / Claude-style braille-dot arc that
+//! - **[`BarSpinner`]** — A Zed / Claude-style braille-dot arc that
 //!   **bounces** (ping-pong) around the perimeter of a configurable rectangle.
 //!   Unlike the rotating spinners, the arc reverses direction at each end.
 //!   Configured with `.width(n)`, `.height(n)`, `.spin()`, `.arc_color()`,
@@ -57,8 +57,8 @@
 //! ```no_run
 //! use ratatui::style::Color;
 //! use tui_spinner::{
-//!     Centre, CircleSpinner, Direction, Flow, LinearSpinner, LinearStyle,
-//!     RectShape, RectSpinner, RectangularSpinner, Spin,
+//!     BarSpinner, Centre, CircleSpinner, Direction, Flow, LinearSpinner, LinearStyle,
+//!     RectShape, RectSpinner, Spin,
 //! };
 //!
 //! // Horizontal ellipsis — default
@@ -96,7 +96,7 @@
 //!     .dim_color(Color::DarkGray);
 //!
 //! // Bouncing rectangle — Zed / Claude style
-//! let rect = RectangularSpinner::new(42)
+//! let bar = BarSpinner::new(42)
 //!     .width(10)
 //!     .height(3)
 //!     .arc_color(Color::Cyan)
@@ -128,16 +128,18 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 
+mod bar_spinner;
 mod circle_spinner;
 mod linear_spinner;
 mod rect_spinner;
-mod rectangular_spinner;
 mod square_spinner;
+mod zed_spinner;
 
+pub use bar_spinner::BarSpinner;
 pub use circle_spinner::CircleSpinner;
 pub use linear_spinner::{Direction, Flow, LinearSpinner, LinearStyle};
 pub use rect_spinner::{Centre, RectShape, RectSpinner, Spin};
-pub use rectangular_spinner::RectangularSpinner;
 pub use square_spinner::SquareSpinner;
+pub use zed_spinner::ZedSpinner;
 // Note: `Centre` and `Spin` are re-exported from rect_spinner.
 // `SquareSpinner` uses the same `Centre` and `Spin` enums via re-export.
