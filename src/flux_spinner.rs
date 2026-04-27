@@ -70,6 +70,11 @@ use crate::Spin;
 /// | `LINE`     | `│ ╱ ─ ╲`                 | 4      | Rotating line                       |
 /// | `BLOCK`    | `▖ ▘ ▝ ▗`                 | 4      | Quarter-block rotation              |
 /// | `ARC`      | `◜ ◝ ◞ ◟`                 | 4      | Quarter-arc rotation                |
+/// | `ARROWS`    | `↑ ↗ → ↘ ↓ ↙ ← ↖`           | 8      | Eight compass arrows          |
+/// | `CLOCK`     | `◷ ◶ ◵ ◴`                     | 4      | Quarter-circle pie slice      |
+/// | `MOON`      | `◓ ◑ ◒ ◐`                     | 4      | Half-circle moon phase        |
+/// | `TRIANGLES` | `▲ ▶ ▼ ◀`                     | 4      | Filled triangle four dirs     |
+/// | `PULSE`     | `⣀ ⣤ ⣶ ⣾ ⣿ ⣾ ⣶ ⣤`         | 8      | Braille fill pulse            |
 ///
 /// # Examples
 ///
@@ -113,6 +118,31 @@ impl FluxFrames {
     ///
     /// `◜ ◝ ◞ ◟`
     pub const ARC: &'static [char] = &['◜', '◝', '◞', '◟'];
+
+    /// Eight compass arrows rotating clockwise.
+    ///
+    /// `↑ ↗ → ↘ ↓ ↙ ← ↖`
+    pub const ARROWS: &'static [char] = &['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+
+    /// Quarter-circle pie slice rotating through four positions.
+    ///
+    /// `◷ ◶ ◵ ◴`
+    pub const CLOCK: &'static [char] = &['◷', '◶', '◵', '◴'];
+
+    /// Half-circle (moon phase) rotating through four positions.
+    ///
+    /// `◓ ◑ ◒ ◐`
+    pub const MOON: &'static [char] = &['◓', '◑', '◒', '◐'];
+
+    /// Filled triangle pointing in four directions.
+    ///
+    /// `▲ ▶ ▼ ◀`
+    pub const TRIANGLES: &'static [char] = &['▲', '▶', '▼', '◀'];
+
+    /// Braille fill pulsing from a thin baseline up to full density and back.
+    ///
+    /// `⣀ ⣤ ⣶ ⣾ ⣿ ⣾ ⣶ ⣤`
+    pub const PULSE: &'static [char] = &['⣀', '⣤', '⣶', '⣾', '⣿', '⣾', '⣶', '⣤'];
 }
 
 // ── Public widget ─────────────────────────────────────────────────────────────
@@ -487,10 +517,16 @@ mod tests {
         assert!(!FluxFrames::LINE.is_empty());
         assert!(!FluxFrames::BLOCK.is_empty());
         assert!(!FluxFrames::ARC.is_empty());
+        assert!(!FluxFrames::ARROWS.is_empty());
+        assert!(!FluxFrames::CLOCK.is_empty());
+        assert!(!FluxFrames::MOON.is_empty());
+        assert!(!FluxFrames::TRIANGLES.is_empty());
+        assert!(!FluxFrames::PULSE.is_empty());
     }
 
     #[test]
     fn all_presets_have_distinct_chars_within_set() {
+        // PULSE deliberately repeats chars (it pulses, not rotates).
         for (name, preset) in [
             ("BRAILLE", FluxFrames::BRAILLE),
             ("ORBIT", FluxFrames::ORBIT),
@@ -498,6 +534,10 @@ mod tests {
             ("LINE", FluxFrames::LINE),
             ("BLOCK", FluxFrames::BLOCK),
             ("ARC", FluxFrames::ARC),
+            ("ARROWS", FluxFrames::ARROWS),
+            ("CLOCK", FluxFrames::CLOCK),
+            ("MOON", FluxFrames::MOON),
+            ("TRIANGLES", FluxFrames::TRIANGLES),
         ] {
             let unique: std::collections::HashSet<char> = preset.iter().copied().collect();
             assert_eq!(unique.len(), preset.len(), "{name} has duplicate chars");
