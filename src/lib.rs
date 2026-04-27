@@ -130,16 +130,16 @@
 
 mod bar_spinner;
 mod circle_spinner;
+mod dot_spinner;
 mod linear_spinner;
 mod rect_spinner;
 mod square_spinner;
-mod zed_spinner;
 
 pub use bar_spinner::BarSpinner;
 pub use circle_spinner::CircleSpinner;
+pub use dot_spinner::DotSpinner;
 pub use linear_spinner::{Direction, Flow, LinearSpinner, LinearStyle};
 pub use rect_spinner::{Centre, RectShape, RectSpinner, Spin};
 pub use square_spinner::SquareSpinner;
-pub use zed_spinner::ZedSpinner;
 // Note: `Centre` and `Spin` are re-exported from rect_spinner.
 // `SquareSpinner` uses the same `Centre` and `Spin` enums via re-export.

@@ -44,8 +44,8 @@ name = "bar_spinner"
 path = "examples/bar_spinner.rs"
 
 [[example]]
-name = "zed_spinner"
-path = "examples/zed_spinner.rs"
+name = "dot_spinner"
+path = "examples/dot_spinner.rs"
 
 [profile.release]
 opt-level = 3
