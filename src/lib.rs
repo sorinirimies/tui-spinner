@@ -137,7 +137,7 @@ mod square_spinner;
 
 pub use bar_spinner::BarSpinner;
 pub use circle_spinner::CircleSpinner;
-pub use flux_spinner::FluxSpinner;
+pub use flux_spinner::{FluxFrames, FluxSpinner};
 pub use linear_spinner::{Direction, Flow, LinearSpinner, LinearStyle};
 pub use rect_spinner::{Centre, RectShape, RectSpinner, Spin};
 pub use square_spinner::SquareSpinner;

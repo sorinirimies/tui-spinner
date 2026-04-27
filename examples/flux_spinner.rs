@@ -2,7 +2,12 @@
 //!
 //! Demonstrates the [`FluxSpinner`] widget — a compact braille rotation
 //! spinner where one dot is missing and the gap rotates clockwise or
-//! counter-clockwise: `⣾ ⣷ ⣯ ⣟ ⡿ ⢿ ⣽ ⣻`
+//! counter-clockwise.
+//!
+//! Layout:
+//! - **Left column**  — Clockwise ↻ : 8 colours at varying speeds
+//! - **Right column** — Counter-CW ↺ : same 8 colours, mirrored rotation
+//! - **Bottom strip** — All [`FluxFrames`] presets side by side
 //!
 //! **Controls:**
 //! - `q` / `Esc` — Quit
@@ -19,7 +24,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
-use tui_spinner::{FluxSpinner, Spin};
+use tui_spinner::{FluxFrames, FluxSpinner, Spin};
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -71,15 +76,17 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 fn render(frame: &mut Frame, app: &App) {
-    let [header, body, footer] = Layout::vertical([
+    let [header, body, presets, footer] = Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(0),
+        Constraint::Length(5),
         Constraint::Length(3),
     ])
     .areas(frame.area());
 
     render_header(frame, header);
     render_body(frame, body, app.tick);
+    render_presets(frame, presets, app.tick);
     render_footer(frame, footer);
 }
 
@@ -126,31 +133,58 @@ fn render_footer(frame: &mut Frame, area: Rect) {
     );
 }
 
-// ── Spinner configs ───────────────────────────────────────────────────────────
+// ── Main body: two columns ────────────────────────────────────────────────────
+//
+// Left  = Clockwise ↻     Right = Counter-Clockwise ↺
+// Same colours and speeds on both sides so the mirrored rotation is obvious.
 
-/// (color, spin, ticks_per_step, label)
-const CONFIGS: &[(Color, Spin, u64, &str)] = &[
-    (Color::Cyan, Spin::Clockwise, 1, "cyan    1t"),
-    (Color::White, Spin::Clockwise, 1, "white   1t"),
-    (Color::LightBlue, Spin::CounterClockwise, 2, "lt-blue 2t"),
-    (Color::Yellow, Spin::Clockwise, 1, "yellow  1t"),
-    (
-        Color::Rgb(255, 165, 0),
-        Spin::CounterClockwise,
-        1,
-        "orange  1t",
-    ),
-    (Color::LightGreen, Spin::Clockwise, 3, "lt-grn  3t"),
-    (Color::Magenta, Spin::CounterClockwise, 1, "magenta 1t"),
-    (Color::LightRed, Spin::Clockwise, 4, "lt-red  4t"),
+/// (color, ticks_per_step, short label)
+const CONFIGS: &[(Color, u64, &str)] = &[
+    (Color::Cyan, 4, "cyan"),
+    (Color::White, 4, "white"),
+    (Color::LightBlue, 5, "lt-blue"),
+    (Color::Yellow, 4, "yellow"),
+    (Color::Rgb(255, 165, 0), 4, "orange"),
+    (Color::LightGreen, 6, "lt-green"),
+    (Color::Magenta, 4, "magenta"),
+    (Color::LightRed, 8, "lt-red"),
 ];
 
 fn render_body(frame: &mut Frame, area: Rect, tick: u64) {
+    let [left, right] =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(area);
+
+    render_direction_column(
+        frame,
+        left,
+        tick,
+        Spin::Clockwise,
+        "↻  Clockwise",
+        Color::Cyan,
+    );
+    render_direction_column(
+        frame,
+        right,
+        tick,
+        Spin::CounterClockwise,
+        "↺  Counter-Clockwise",
+        Color::LightBlue,
+    );
+}
+
+fn render_direction_column(
+    frame: &mut Frame,
+    area: Rect,
+    tick: u64,
+    spin: Spin,
+    title: &str,
+    border_color: Color,
+) {
     let outer = Block::bordered()
-        .title(" 1×1  ·  CW ↻ / CCW ↺ ")
+        .title(format!(" {title} "))
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan))
+        .border_style(Style::default().fg(border_color))
         .padding(Padding::horizontal(1));
 
     let inner = outer.inner(area);
@@ -158,25 +192,21 @@ fn render_body(frame: &mut Frame, area: Rect, tick: u64) {
 
     let n = CONFIGS.len();
     let row_h = (inner.height / n as u16).max(1);
+
     let constraints: Vec<Constraint> = (0..n)
         .map(|_| Constraint::Length(row_h))
         .chain([Constraint::Min(0)])
         .collect();
     let rows = Layout::vertical(constraints).split(inner);
 
-    for (i, &(color, spin, tps, label)) in CONFIGS.iter().enumerate() {
+    for (i, &(color, tps, label)) in CONFIGS.iter().enumerate() {
         if i >= rows.len().saturating_sub(1) {
             break;
         }
         let row = rows[i];
 
-        // spinner | label | direction symbol
-        let dir_symbol = if matches!(spin, Spin::Clockwise) {
-            "↻"
-        } else {
-            "↺"
-        };
-        let full_label = format!("  {label}  {dir_symbol}");
+        // Spinner | label | speed hint
+        let hint = format!("  {}  {}t", label, tps);
 
         let [spin_area, label_area] =
             Layout::horizontal([Constraint::Length(1), Constraint::Min(0)]).areas(row);
@@ -189,8 +219,65 @@ fn render_body(frame: &mut Frame, area: Rect, tick: u64) {
             spin_area,
         );
         frame.render_widget(
-            Paragraph::new(Span::styled(full_label, Style::default().fg(color))),
+            Paragraph::new(Span::styled(hint, Style::default().fg(color))),
             label_area,
+        );
+    }
+}
+
+// ── Presets strip ─────────────────────────────────────────────────────────────
+//
+// Shows every FluxFrames preset side by side so the different symbol sets
+// are easy to compare at a glance.
+
+/// (preset, name, color)
+const PRESETS: &[(&'static [char], &str, Color)] = &[
+    (FluxFrames::BRAILLE, "BRAILLE", Color::Cyan),
+    (FluxFrames::ORBIT, "ORBIT", Color::LightBlue),
+    (FluxFrames::CLASSIC, "CLASSIC", Color::Yellow),
+    (FluxFrames::LINE, "LINE", Color::Rgb(255, 165, 0)),
+    (FluxFrames::BLOCK, "BLOCK", Color::LightGreen),
+    (FluxFrames::ARC, "ARC", Color::Magenta),
+];
+
+fn render_presets(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = Block::bordered()
+        .title(" Frame presets — .frames(FluxFrames::…) ")
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .padding(Padding::horizontal(1));
+
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
+
+    // Equal-width columns, one per preset.
+    let n = PRESETS.len();
+    let constraints: Vec<Constraint> = (0..n).map(|_| Constraint::Ratio(1, n as u32)).collect();
+    let cols = Layout::horizontal(constraints).split(inner);
+
+    // Two rows inside each column: spinner on top, name below.
+    for (i, &(preset, name, color)) in PRESETS.iter().enumerate() {
+        if i >= cols.len() {
+            break;
+        }
+        let col = cols[i];
+
+        let [spin_row, name_row] =
+            Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(col);
+
+        frame.render_widget(
+            FluxSpinner::new(tick)
+                .frames(preset)
+                .color(color)
+                .ticks_per_step(4)
+                .alignment(Alignment::Center),
+            spin_row,
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(name, Style::default().fg(Color::DarkGray)))
+                .alignment(Alignment::Center),
+            name_row,
         );
     }
 }

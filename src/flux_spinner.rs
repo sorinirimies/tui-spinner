@@ -55,33 +55,65 @@ use ratatui::widgets::{Block, Paragraph, Widget};
 
 use crate::Spin;
 
-// ── Frame table ───────────────────────────────────────────────────────────────
+// ── Frame presets ─────────────────────────────────────────────────────────────
 
-/// 8 braille frames — full cell (`⣿`, 0xFF) with one dot missing.
+/// Built-in frame sequences for [`FluxSpinner`].
 ///
-/// Index order is **clockwise**.  For counter-clockwise, the frame index is
-/// negated: `(8 - idx) % 8`.
+/// Pass any preset (or a custom `&'static [char]` slice) to
+/// [`FluxSpinner::frames`] to change the animation glyphs.
 ///
-/// | index | byte | glyph | missing dot | position      |
-/// |-------|------|-------|-------------|---------------|
-/// |   0   | 0xFE | `⣾`  | dot 1       | top-left      |
-/// |   1   | 0xF7 | `⣷`  | dot 4       | top-right     |
-/// |   2   | 0xEF | `⣯`  | dot 5       | mid-right     |
-/// |   3   | 0xDF | `⣟`  | dot 6       | bot-mid-right |
-/// |   4   | 0x7F | `⡿`  | dot 8       | bot-right     |
-/// |   5   | 0xBF | `⢿`  | dot 7       | bot-left      |
-/// |   6   | 0xFD | `⣽`  | dot 2       | mid-left      |
-/// |   7   | 0xFB | `⣻`  | dot 3       | bot-mid-left  |
-const FRAMES: [u8; 8] = [
-    0xFE, // ⣾  dot 1 missing  (top-left)
-    0xF7, // ⣷  dot 4 missing  (top-right)
-    0xEF, // ⣯  dot 5 missing  (mid-right)
-    0xDF, // ⣟  dot 6 missing  (bot-mid-right)
-    0x7F, // ⡿  dot 8 missing  (bot-right)
-    0xBF, // ⢿  dot 7 missing  (bot-left)
-    0xFD, // ⣽  dot 2 missing  (mid-left)
-    0xFB, // ⣻  dot 3 missing  (bot-mid-left)
-];
+/// | Preset     | Glyphs                        | Frames | Description                         |
+/// |------------|-------------------------------|--------|-------------------------------------|
+/// | `BRAILLE`  | `⣾ ⣷ ⣯ ⣟ ⡿ ⢿ ⣽ ⣻`     | 8      | Full cell, one dot missing (default)|
+/// | `ORBIT`    | `⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂`     | 8      | Single dot orbiting (inverse)       |
+/// | `CLASSIC`  | `⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏` | 10     | Classic braille spinner             |
+/// | `LINE`     | `│ ╱ ─ ╲`                 | 4      | Rotating line                       |
+/// | `BLOCK`    | `▖ ▘ ▝ ▗`                 | 4      | Quarter-block rotation              |
+/// | `ARC`      | `◜ ◝ ◞ ◟`                 | 4      | Quarter-arc rotation                |
+///
+/// # Examples
+///
+/// ```
+/// use tui_spinner::{FluxSpinner, FluxFrames};
+///
+/// let braille = FluxSpinner::new(0);  // BRAILLE is the default
+/// let orbit   = FluxSpinner::new(0).frames(FluxFrames::ORBIT);
+/// let line    = FluxSpinner::new(0).frames(FluxFrames::LINE);
+/// let custom  = FluxSpinner::new(0).frames(&['a', 'b', 'c', 'd']);
+/// ```
+pub struct FluxFrames;
+
+impl FluxFrames {
+    /// Full braille cell with one dot missing — the gap rotates clockwise.
+    ///
+    /// `⣾ ⣷ ⣯ ⣟ ⡿ ⢿ ⣽ ⣻` — **default**.
+    pub const BRAILLE: &'static [char] = &['⣾', '⣷', '⣯', '⣟', '⡿', '⢿', '⣽', '⣻'];
+
+    /// Single braille dot orbiting clockwise — visual complement of `BRAILLE`.
+    ///
+    /// `⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂`
+    pub const ORBIT: &'static [char] = &['⠁', '⠈', '⠐', '⠠', '⢀', '⡀', '⠄', '⠂'];
+
+    /// Classic 10-frame braille spinner.
+    ///
+    /// `⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏`
+    pub const CLASSIC: &'static [char] = &['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+    /// Rotating line — 4 frames.
+    ///
+    /// `│ ╱ ─ ╲`
+    pub const LINE: &'static [char] = &['│', '╱', '─', '╲'];
+
+    /// Quarter-block rotation — 4 frames.
+    ///
+    /// `▖ ▘ ▝ ▗`
+    pub const BLOCK: &'static [char] = &['▖', '▘', '▝', '▗'];
+
+    /// Quarter-arc rotation — 4 frames.
+    ///
+    /// `◜ ◝ ◞ ◟`
+    pub const ARC: &'static [char] = &['◜', '◝', '◞', '◟'];
+}
 
 // ── Public widget ─────────────────────────────────────────────────────────────
 
@@ -111,11 +143,12 @@ const FRAMES: [u8; 8] = [
 /// | `color`          | [`Color::Cyan`]             |
 /// | `ticks_per_step` | `1`                         |
 /// | `phase_step`     | `1`                         |
+/// | `frames`         | [`FluxFrames::BRAILLE`]     |
 ///
 /// # Examples
 ///
 /// ```
-/// use tui_spinner::{FluxSpinner, Spin};
+/// use tui_spinner::{FluxFrames, FluxSpinner, Spin};
 ///
 /// // Minimal 1×1 clockwise spinner
 /// let s = FluxSpinner::new(42);
@@ -125,6 +158,9 @@ const FRAMES: [u8; 8] = [
 ///     .width(8)
 ///     .spin(Spin::CounterClockwise)
 ///     .phase_step(1);
+///
+/// // Custom frame sequence
+/// let line = FluxSpinner::new(42).frames(FluxFrames::LINE);
 /// ```
 #[derive(Debug, Clone)]
 pub struct FluxSpinner<'a> {
@@ -146,6 +182,8 @@ pub struct FluxSpinner<'a> {
     ///        wave in the spin direction).
     /// `4` → cells 4 frames apart have opposite phase (`⣾` vs `⡿`).
     phase_step: u8,
+    /// The frame sequence to animate through (default [`FluxFrames::BRAILLE`]).
+    frames: &'static [char],
     block: Option<Block<'a>>,
     style: Style,
     alignment: Alignment,
@@ -172,6 +210,7 @@ impl<'a> FluxSpinner<'a> {
             color: Color::Cyan,
             ticks_per_step: 1,
             phase_step: 1,
+            frames: FluxFrames::BRAILLE,
             block: None,
             style: Style::default(),
             alignment: Alignment::Left,
@@ -283,6 +322,26 @@ impl<'a> FluxSpinner<'a> {
         self
     }
 
+    /// Sets the frame sequence (default [`FluxFrames::BRAILLE`]).
+    ///
+    /// Use one of the [`FluxFrames`] presets or supply any
+    /// `&'static [char]` slice for a fully custom animation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::{FluxSpinner, FluxFrames};
+    ///
+    /// let orbit  = FluxSpinner::new(0).frames(FluxFrames::ORBIT);
+    /// let line   = FluxSpinner::new(0).frames(FluxFrames::LINE);
+    /// let custom = FluxSpinner::new(0).frames(&['◐', '◓', '◑', '◒']);
+    /// ```
+    #[must_use]
+    pub fn frames(mut self, frames: &'static [char]) -> Self {
+        self.frames = frames;
+        self
+    }
+
     /// Wraps the spinner in a [`Block`].
     ///
     /// # Examples
@@ -328,32 +387,29 @@ impl<'a> FluxSpinner<'a> {
     }
 
     fn build_lines(&self) -> Vec<Line<'static>> {
-        #[allow(clippy::cast_possible_truncation)]
-        let base_frame = (self.tick / self.ticks_per_step) as u8;
+        let n = self.frames.len();
+        if n == 0 {
+            return vec![];
+        }
 
+        // Use usize throughout — avoids cast truncation on large tick values.
+        #[allow(clippy::cast_possible_truncation)]
+        let base = (self.tick / self.ticks_per_step) as usize;
         let ccw = matches!(self.spin, Spin::CounterClockwise);
 
         (0..self.height)
             .map(|r| {
                 let spans: Vec<Span<'static>> = (0..self.width)
                     .map(|c| {
-                        // Linear cell index → apply phase offset.
-                        #[allow(clippy::cast_possible_truncation)]
-                        let cell_idx = (r * self.width + c) as u8;
-                        let phase = cell_idx.wrapping_mul(self.phase_step);
+                        let cell_idx = r * self.width + c;
+                        let phase = cell_idx * usize::from(self.phase_step);
+                        let raw = base.wrapping_add(phase);
 
-                        // For CW:  index advances forward through FRAMES.
-                        // For CCW: index retreats backward through FRAMES,
-                        //          which also reverses the wave direction.
-                        let raw = base_frame.wrapping_add(phase);
-                        let frame_idx = if ccw {
-                            (8u8.wrapping_sub(raw % 8)) % 8
-                        } else {
-                            raw % 8
-                        };
+                        // CW:  advance through frames.
+                        // CCW: retreat through frames (reverses wave too).
+                        let frame_idx = if ccw { (n - raw % n) % n } else { raw % n };
 
-                        let byte = FRAMES[frame_idx as usize];
-                        let ch = char::from_u32(0x2800 + u32::from(byte)).unwrap_or('⣾');
+                        let ch = self.frames[frame_idx];
                         Span::styled(ch.to_string(), Style::default().fg(self.color))
                     })
                     .collect();
@@ -419,36 +475,33 @@ mod tests {
     // ── Frame table ───────────────────────────────────────────────────────────
 
     #[test]
-    fn all_frames_are_distinct() {
-        let mut seen = std::collections::HashSet::new();
-        for &b in &FRAMES {
-            assert!(seen.insert(b), "duplicate frame byte 0x{b:02X}");
-        }
+    fn braille_preset_has_eight_frames() {
+        assert_eq!(FluxFrames::BRAILLE.len(), 8);
     }
 
     #[test]
-    fn all_frames_are_full_minus_one_dot() {
-        for &b in &FRAMES {
-            assert_eq!(
-                b.count_ones(),
-                7,
-                "frame 0x{b:02X} should have 7 bits set (one dot missing)"
-            );
-        }
+    fn all_presets_non_empty() {
+        assert!(!FluxFrames::BRAILLE.is_empty());
+        assert!(!FluxFrames::ORBIT.is_empty());
+        assert!(!FluxFrames::CLASSIC.is_empty());
+        assert!(!FluxFrames::LINE.is_empty());
+        assert!(!FluxFrames::BLOCK.is_empty());
+        assert!(!FluxFrames::ARC.is_empty());
     }
 
     #[test]
-    fn frames_cover_all_eight_bit_positions() {
-        let cleared_bits: Vec<u8> = FRAMES.iter().map(|&b| (!b) & 0xFF).collect();
-        for (i, &mask) in cleared_bits.iter().enumerate() {
-            assert_eq!(
-                mask.count_ones(),
-                1,
-                "frame {i}: cleared mask 0x{mask:02X} should have exactly 1 bit"
-            );
+    fn all_presets_have_distinct_chars_within_set() {
+        for (name, preset) in [
+            ("BRAILLE", FluxFrames::BRAILLE),
+            ("ORBIT", FluxFrames::ORBIT),
+            ("CLASSIC", FluxFrames::CLASSIC),
+            ("LINE", FluxFrames::LINE),
+            ("BLOCK", FluxFrames::BLOCK),
+            ("ARC", FluxFrames::ARC),
+        ] {
+            let unique: std::collections::HashSet<char> = preset.iter().copied().collect();
+            assert_eq!(unique.len(), preset.len(), "{name} has duplicate chars");
         }
-        let combined: u8 = cleared_bits.iter().fold(0u8, |acc, &m| acc | m);
-        assert_eq!(combined, 0xFF, "all 8 dot positions must be covered");
     }
 
     // ── Clockwise animation ───────────────────────────────────────────────────
@@ -651,6 +704,7 @@ mod tests {
             .color(Color::Green)
             .ticks_per_step(3)
             .phase_step(2)
+            .frames(FluxFrames::LINE)
             .block(Block::bordered())
             .alignment(Alignment::Center);
         assert_eq!(s.width, 6);
@@ -659,10 +713,11 @@ mod tests {
         assert_eq!(s.color, Color::Green);
         assert_eq!(s.ticks_per_step, 3);
         assert_eq!(s.phase_step, 2);
+        assert_eq!(s.frames, FluxFrames::LINE);
     }
 
     #[test]
-    fn output_contains_only_valid_braille() {
+    fn output_chars_come_from_frame_set() {
         for tick in 0..8u64 {
             for spin in [Spin::Clockwise, Spin::CounterClockwise] {
                 let lines = FluxSpinner::new(tick)
@@ -670,17 +725,43 @@ mod tests {
                     .height(2)
                     .spin(spin)
                     .build_lines();
+                let frame_set: std::collections::HashSet<char> =
+                    FluxFrames::BRAILLE.iter().copied().collect();
                 for line in &lines {
                     for span in &line.spans {
                         let ch = span.content.chars().next().unwrap();
                         assert!(
-                            ('\u{2800}'..='\u{28FF}').contains(&ch),
-                            "character U+{:04X} is not a braille glyph",
+                            frame_set.contains(&ch),
+                            "U+{:04X} not in BRAILLE preset",
                             ch as u32
                         );
                     }
                 }
             }
         }
+    }
+
+    #[test]
+    fn custom_frames_respected() {
+        let frames: &'static [char] = &['a', 'b', 'c', 'd'];
+        let lines = FluxSpinner::new(0).frames(frames).build_lines();
+        let ch = lines[0].spans[0].content.chars().next().unwrap();
+        assert_eq!(ch, 'a', "tick=0 should show first custom frame");
+
+        let lines4 = FluxSpinner::new(4).frames(frames).build_lines();
+        let ch4 = lines4[0].spans[0].content.chars().next().unwrap();
+        assert_eq!(ch4, 'a', "tick=4 (n=4) wraps back to first frame");
+    }
+
+    #[test]
+    fn frames_builder_changes_output() {
+        let braille = FluxSpinner::new(1)
+            .frames(FluxFrames::BRAILLE)
+            .build_lines();
+        let line = FluxSpinner::new(1).frames(FluxFrames::LINE).build_lines();
+        assert_ne!(
+            braille, line,
+            "different frame sets produce different output"
+        );
     }
 }
