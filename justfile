@@ -3,7 +3,6 @@
 # Install git-cliff: cargo install git-cliff
 # Install vhs:       brew install vhs  OR  go install github.com/charmbracelet/vhs@latest
 # Usage: just <task>
-
 # -- Default ---------------------------------------------------------------
 
 default:
@@ -91,26 +90,26 @@ check-all: fmt-check clippy test
 
 # -- VHS Demo GIFs --------------------------------------------------------
 
-VHS_DIR       := "examples/vhs"
+VHS_DIR := "examples/vhs"
 VHS_GENERATED := "examples/vhs/generated"
 
 # Generate all VHS demo GIFs
 vhs-all: _check-vhs
-    @mkdir -p {{VHS_GENERATED}}
+    @mkdir -p {{ VHS_GENERATED }}
     @echo "=== tui-spinner VHS Tapes ==="
-    @for tape in {{VHS_DIR}}/*.tape; do \
+    @for tape in {{ VHS_DIR }}/*.tape; do \
         echo ">>  $$tape"; \
         vhs "$$tape" || echo "Failed: $$tape"; \
     done
-    @echo "Demo GIFs generated -> {{VHS_GENERATED}}/"
+    @echo "Demo GIFs generated -> {{ VHS_GENERATED }}/"
 
 # Render a single tape by name, e.g.: just vhs-tape spinner-demo
 vhs-tape name: _check-vhs
-    @if [ -f "{{VHS_DIR}}/{{name}}.tape" ]; then \
-        echo ">>  {{VHS_DIR}}/{{name}}.tape"; \
-        vhs "{{VHS_DIR}}/{{name}}.tape" && echo "Done."; \
+    @if [ -f "{{ VHS_DIR }}/{{ name }}.tape" ]; then \
+        echo ">>  {{ VHS_DIR }}/{{ name }}.tape"; \
+        vhs "{{ VHS_DIR }}/{{ name }}.tape" && echo "Done."; \
     else \
-        echo "Tape not found: {{name}}.tape"; \
+        echo "Tape not found: {{ name }}.tape"; \
         echo ""; \
         just vhs-list; \
         exit 1; \
@@ -118,11 +117,11 @@ vhs-tape name: _check-vhs
 
 # List all available VHS tapes and any already-generated GIFs
 vhs-list:
-    @echo "Tapes  ->  {{VHS_DIR}}/"
-    @ls {{VHS_DIR}}/*.tape 2>/dev/null | sed 's|.*/||; s|\.tape||' | sed 's/^/  /' || echo "  (none)"
+    @echo "Tapes  ->  {{ VHS_DIR }}/"
+    @ls {{ VHS_DIR }}/*.tape 2>/dev/null | sed 's|.*/||; s|\.tape||' | sed 's/^/  /' || echo "  (none)"
     @echo ""
-    @echo "Generated  ->  {{VHS_GENERATED}}/"
-    @ls {{VHS_GENERATED}}/*.gif 2>/dev/null | sed 's|.*/||' | sed 's/^/  /' || echo "  (none yet)"
+    @echo "Generated  ->  {{ VHS_GENERATED }}/"
+    @ls {{ VHS_GENERATED }}/*.gif 2>/dev/null | sed 's|.*/||' | sed 's/^/  /' || echo "  (none yet)"
 
 # Pull GIF files from Git LFS (run once after a fresh clone)
 lfs-pull:
@@ -162,7 +161,7 @@ changelog-preview: _check-git-cliff
 
 # Bump the version, regenerate Cargo.lock + CHANGELOG.md, commit and tag.
 bump version: check-all _check-git-cliff _check-nu
-    nu scripts/bump_version.nu --yes {{version}}
+    nu scripts/bump_version.nu --yes {{ version }}
 
 # -- Publish (crates.io) --------------------------------------------------
 
@@ -222,6 +221,10 @@ version: _check-nu
 
 # -- Git remotes -----------------------------------------------------------
 
+# Show all configured remotes
+remotes:
+    @git remote -v
+
 # Push main branch to GitHub
 push:
     git push origin main
@@ -234,36 +237,79 @@ push-tags:
 push-gitea:
     git push gitea main
 
+# Push main branch to Gitea Starscream
+push-gitea-starscream:
+    git push gitea_starscream main
+
+# Push main to all remotes (continues on failure)
+push-all:
+    #!/usr/bin/env sh
+    failed=""
+    git push origin main             || failed="$failed origin"
+    git push gitea main              || failed="$failed gitea"
+    git push gitea_starscream main   || failed="$failed gitea_starscream"
+    if [ -n "$failed" ]; then
+        echo "⚠️  Failed to push to:$failed"
+    else
+        echo "✅ Pushed to GitHub, Gitea, and Gitea Starscream!"
+    fi
+
+# Force-push to all remotes (continues on failure)
+push-all-force:
+    #!/usr/bin/env sh
+    failed=""
+    git push --force origin main             || failed="$failed origin"
+    git push --force gitea main              || failed="$failed gitea"
+    git push --force gitea_starscream main   || failed="$failed gitea_starscream"
+    if [ -n "$failed" ]; then
+        echo "⚠️  Failed to force-push to:$failed"
+    else
+        echo "✅ Force-pushed to all remotes!"
+    fi
+
 # Push tags to Gitea
 push-tags-gitea:
     git push gitea --tags
 
-# Push main to both GitHub and Gitea
-push-all:
-    git push origin main
-    git push gitea main
-
-# Push tags to both remotes
+# Push tags to all remotes (continues on failure)
 push-tags-all:
-    git push origin --tags
-    git push gitea --tags
+    #!/usr/bin/env sh
+    failed=""
+    git push origin --tags             || failed="$failed origin"
+    git push gitea --tags              || failed="$failed gitea"
+    git push gitea_starscream --tags   || failed="$failed gitea_starscream"
+    if [ -n "$failed" ]; then
+        echo "⚠️  Failed to push tags to:$failed"
+    else
+        echo "✅ Tags pushed to all remotes!"
+    fi
 
-# Push branch + tags to both remotes (after a release bump)
+# Push branch + tags to all remotes (after a release bump)
 push-release-all:
-    git push --follow-tags origin main
-    git push --follow-tags gitea main
+    #!/usr/bin/env sh
+    failed=""
+    git push --follow-tags origin main             || failed="$failed origin"
+    git push --follow-tags gitea main              || failed="$failed gitea"
+    git push --follow-tags gitea_starscream main   || failed="$failed gitea_starscream"
+    if [ -n "$failed" ]; then
+        echo "⚠️  Failed to push release to:$failed"
+    else
+        echo "✅ Release pushed to all remotes!"
+    fi
 
-# Force-sync Gitea from GitHub (overwrite Gitea with origin state)
-sync-gitea:
+# Force-sync all Gitea remotes from GitHub (overwrite with origin state)
+sync-giteas:
     git push gitea main --force
     git push gitea --tags --force
-
-# Show all configured remotes
-remotes:
-    @git remote -v
+    git push gitea_starscream main --force
+    git push gitea_starscream --tags --force
 
 # -- Gitea setup -----------------------------------------------------------
 
-# Set up Gitea as a second remote (usage: just setup-gitea <url>)
+# Add or update the 'gitea' remote (usage: just setup-gitea <url>)
 setup-gitea url: _check-nu
-    nu scripts/setup_gitea.nu {{url}}
+    nu scripts/setup_gitea.nu --remote gitea {{ url }}
+
+# Add or update the 'gitea_starscream' remote (usage: just setup-gitea-starscream <url>)
+setup-gitea-starscream url: _check-nu
+    nu scripts/setup_gitea.nu --remote gitea_starscream {{ url }}

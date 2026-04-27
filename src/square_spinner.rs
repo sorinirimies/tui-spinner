@@ -70,6 +70,7 @@ struct Grid {
 }
 
 impl Grid {
+    #[allow(clippy::cast_sign_loss)]
     fn set(&mut self, row: isize, col: isize, value: bool) {
         let r = (row + self.offset) as usize;
         let c = col as usize;
@@ -209,22 +210,12 @@ fn y_dir(nodes: &[Coord]) -> isize {
 
 fn traversing_x(nodes: &[Coord]) -> bool {
     let first_col = nodes[0].col;
-    for i in 1..nodes.len() {
-        if nodes[i].col != first_col {
-            return false;
-        }
-    }
-    true
+    nodes.iter().skip(1).all(|n| n.col == first_col)
 }
 
 fn traversing_y(nodes: &[Coord]) -> bool {
     let first_row = nodes[0].row;
-    for i in 1..nodes.len() {
-        if nodes[i].row != first_row {
-            return false;
-        }
-    }
-    true
+    nodes.iter().skip(1).all(|n| n.row == first_row)
 }
 
 fn step(nodes: &mut Vec<Coord>, rotate: &HashMap<Coord, Coord>) {
@@ -268,6 +259,7 @@ struct SquareEngine {
 }
 
 impl SquareEngine {
+    #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
     fn build(size: usize, centre: Centre) -> Self {
         let size = size.clamp(2, 8);
         let dm = calc_dimension(size);
@@ -342,8 +334,8 @@ impl SquareEngine {
         let total_rows = self.grid.cells.len();
         let total_cols = self.grid.cells[0].len();
 
-        let char_rows = (total_rows + 3) / 4;
-        let char_cols = (total_cols + 1) / 2;
+        let char_rows = total_rows.div_ceil(4);
+        let char_cols = total_cols.div_ceil(2);
 
         let mut screen = vec![vec![0u8; char_cols]; char_rows];
 
@@ -584,12 +576,13 @@ impl<'a> SquareSpinner<'a> {
     /// assert_eq!(rows, 3);
     /// ```
     #[must_use]
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn char_size(&self) -> (u16, u16) {
         let dm = calc_dimension(self.size);
         let offset = vertical_offset(self.size) as usize;
         let total_rows = dm + offset;
-        let char_cols = (dm + 1) / 2;
-        let char_rows = (total_rows + 3) / 4;
+        let char_cols = dm.div_ceil(2);
+        let char_rows = total_rows.div_ceil(4);
         (char_cols as u16, char_rows as u16)
     }
 

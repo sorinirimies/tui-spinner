@@ -74,6 +74,7 @@ struct Grid {
 
 impl Grid {
     /// `set` applies the offset, matching `grid.cells[row+grid.offset][col]`.
+    #[allow(clippy::cast_sign_loss)]
     fn set(&mut self, row: isize, col: isize, value: bool) {
         let r = (row + self.offset) as usize;
         let c = col as usize;
@@ -222,22 +223,12 @@ fn y_dir(nodes: &[Coord]) -> isize {
 
 fn traversing_x(nodes: &[Coord]) -> bool {
     let first_col = nodes[0].col;
-    for i in 1..nodes.len() {
-        if nodes[i].col != first_col {
-            return false;
-        }
-    }
-    true
+    nodes.iter().skip(1).all(|n| n.col == first_col)
 }
 
 fn traversing_y(nodes: &[Coord]) -> bool {
     let first_row = nodes[0].row;
-    for i in 1..nodes.len() {
-        if nodes[i].row != first_row {
-            return false;
-        }
-    }
-    true
+    nodes.iter().skip(1).all(|n| n.row == first_row)
 }
 
 /// Exact port of Go `step`.  Note: Go uses **two separate `if`s**, not
@@ -285,6 +276,7 @@ struct SquareEngine {
 
 impl SquareEngine {
     /// Exact port of Go `makeSpinner`.
+    #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
     fn build(size: usize, centre: Centre, _spin: Spin) -> Self {
         let size = size.clamp(2, 8);
         let dm = calc_dimension(size);
@@ -374,8 +366,8 @@ impl SquareEngine {
 
         // Go: height := (len(sp.grid.cells) + 3) / 4
         //     width  := (len(sp.grid.cells[0]) + 1) / 2
-        let char_rows = (total_rows + 3) / 4;
-        let char_cols = (total_cols + 1) / 2;
+        let char_rows = total_rows.div_ceil(4);
+        let char_cols = total_cols.div_ceil(2);
 
         let mut screen = vec![vec![0u8; char_cols]; char_rows];
 

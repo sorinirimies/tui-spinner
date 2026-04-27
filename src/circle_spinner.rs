@@ -10,7 +10,7 @@
 //!    tall.  Because each braille character packs 2 dot-cols horizontally
 //!    and 4 dot-rows vertically, and terminal cells are ~2× taller than
 //!    wide, these two factors cancel exactly: 1 dot-col pixel width =
-//!    cell_w/2, 1 dot-row pixel height = cell_h/4 = cell_w/2.  So a 1:1
+//!    `cell_w/2`, 1 dot-row pixel height = `cell_h/4` = `cell_w/2`.  So a 1:1
 //!    dot pitch produces a visually round circle.
 //!
 //! 2. The perimeter dots are sorted clockwise (12-o'clock first).
@@ -66,6 +66,7 @@ impl Dot {
 
 /// Compute all dot positions on a circle perimeter using the midpoint circle
 /// algorithm at 1:1 dot pitch, then sort them clockwise from 12 o'clock.
+#[allow(clippy::cast_possible_wrap)]
 fn circle_perimeter(r: usize) -> Vec<Dot> {
     if r == 0 {
         return vec![Dot::new(0, 0)];
@@ -105,6 +106,7 @@ fn circle_perimeter(r: usize) -> Vec<Dot> {
 }
 
 /// Sort `(row, col)` dot coords into clockwise order starting from 12 o'clock.
+#[allow(clippy::cast_precision_loss)]
 fn sort_clockwise(dots: Vec<(isize, isize)>) -> Vec<Dot> {
     if dots.is_empty() {
         return vec![];
@@ -160,6 +162,7 @@ struct CircleEngine {
 }
 
 impl CircleEngine {
+    #[allow(clippy::cast_sign_loss)]
     fn build(radius: usize, arc_len_override: usize, spin: Spin) -> Self {
         let perimeter = circle_perimeter(radius);
         let n = perimeter.len();
@@ -213,6 +216,7 @@ impl CircleEngine {
     }
 
     #[inline]
+    #[allow(clippy::cast_sign_loss)]
     fn set_dot(&mut self, dot: Dot, value: bool) {
         let r = (dot.row + self.row_offset) as usize;
         let c = (dot.col + self.col_offset) as usize;
@@ -247,6 +251,7 @@ impl CircleEngine {
     /// Render the grid into braille [`Line`]s.
     ///
     /// Arc dots → `arc_color`, dim ring dots → `dim_color`.
+    #[allow(clippy::cast_sign_loss)]
     fn render_lines(&self, arc_color: Color, dim_color: Color) -> Vec<Line<'static>> {
         let char_rows = self.dot_rows.div_ceil(4);
         let char_cols = self.dot_cols.div_ceil(2);
@@ -502,6 +507,7 @@ impl<'a> CircleSpinner<'a> {
     /// assert_eq!(rows, 3);
     /// ```
     #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn char_size(&self) -> (u16, u16) {
         let dot_dim = self.radius * 2 + 1;
         let char_cols = dot_dim.div_ceil(2) as u16;
