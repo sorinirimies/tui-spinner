@@ -42,6 +42,12 @@
 //!
 //!   Configured with `.radius(n)`, `.spin()`, `.arc_color()`, and `.dim_color()`.
 //!
+//! - **[`RectangularSpinner`]** — A Zed / Claude-style braille-dot arc that
+//!   **bounces** (ping-pong) around the perimeter of a configurable rectangle.
+//!   Unlike the rotating spinners, the arc reverses direction at each end.
+//!   Configured with `.width(n)`, `.height(n)`, `.spin()`, `.arc_color()`,
+//!   and `.dim_color()`.
+//!
 //! - **[`SquareSpinner`]** — Legacy alias kept for backward compatibility.
 //!   Delegates to [`RectSpinner`] with [`RectShape::Square`].
 //!   Prefer [`RectSpinner`] for new code.
@@ -52,7 +58,7 @@
 //! use ratatui::style::Color;
 //! use tui_spinner::{
 //!     Centre, CircleSpinner, Direction, Flow, LinearSpinner, LinearStyle,
-//!     RectShape, RectSpinner, Spin,
+//!     RectShape, RectSpinner, RectangularSpinner, Spin,
 //! };
 //!
 //! // Horizontal ellipsis — default
@@ -88,6 +94,13 @@
 //!     .spin(Spin::CounterClockwise)
 //!     .arc_color(Color::Cyan)
 //!     .dim_color(Color::DarkGray);
+//!
+//! // Bouncing rectangle — Zed / Claude style
+//! let rect = RectangularSpinner::new(42)
+//!     .width(10)
+//!     .height(3)
+//!     .arc_color(Color::Cyan)
+//!     .dim_color(Color::DarkGray);
 //! ```
 //!
 //! ## Integration pattern
@@ -118,11 +131,13 @@
 mod circle_spinner;
 mod linear_spinner;
 mod rect_spinner;
+mod rectangular_spinner;
 mod square_spinner;
 
 pub use circle_spinner::CircleSpinner;
 pub use linear_spinner::{Direction, Flow, LinearSpinner, LinearStyle};
 pub use rect_spinner::{Centre, RectShape, RectSpinner, Spin};
+pub use rectangular_spinner::RectangularSpinner;
 pub use square_spinner::SquareSpinner;
 // Note: `Centre` and `Spin` are re-exported from rect_spinner.
 // `SquareSpinner` uses the same `Centre` and `Spin` enums via re-export.

@@ -139,7 +139,7 @@ impl LinearStyle {
     /// Symbols whose Unicode East Asian Width property is "Wide" occupy 2
     /// columns; callers that lay out the spinner area manually (e.g. in
     /// a Ratatui [`Layout`]) should multiply `total_slots` by this value
-    /// to get the correct [`Constraint::Length`].
+    /// to get the correct `Constraint::Length` value.
     ///
     /// [`Layout`]: ratatui::layout::Layout
     ///
