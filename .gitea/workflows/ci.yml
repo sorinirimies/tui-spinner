@@ -1,127 +1,136 @@
-# ─────────────────────────────────────────────────────────────────────
-#  CI — tui-spinner (Gitea Actions)
-#  Runs on every push to main/master/develop and on pull requests.
-#  Pure-Rust library crate — no system libraries needed.
-#
-#  Mirror of .github/workflows/ci.yml adapted for Gitea Actions:
-#    - No marketplace actions that are GitHub-only.
-#    - Plain cargo commands for all lint / check steps.
-# ─────────────────────────────────────────────────────────────────────
-
 name: CI
 
 on:
-  push:
-    branches: [main, master, develop]
   pull_request:
-    branches: [main, master, develop]
-
-# Cancel in-progress runs for the same branch / PR.
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  push:
+    branches:
+      - main
+      - master
+      - develop
 
 env:
   CARGO_TERM_COLOR: always
 
+# Cancel in-progress runs on the same branch/PR so we never queue up stale
+# jobs after a force-push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
-  # ── 1. Formatting ────────────────────────────────────────────────
+  # ── 1. Formatting ────────────────────────────────────────────────────────────
   fmt:
-    name: Rustfmt
+    name: fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
+      - name: Install Rust stable + rustfmt
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          . "$HOME/.cargo/env"
+          rustup component add rustfmt
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
         run: cargo fmt --check
 
-  # ── 2. Clippy lints ──────────────────────────────────────────────
+  # ── 2. Clippy ────────────────────────────────────────────────────────────────
   clippy:
-    name: Clippy
+    name: clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      - name: Install Rust stable + clippy
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          . "$HOME/.cargo/env"
+          rustup component add clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
 
       - name: Run clippy
         run: cargo clippy --all-features -- -D warnings
 
-  # ── 3. Tests ─────────────────────────────────────────────────────
+  # ── 3. Tests ─────────────────────────────────────────────────────────────────
   test:
-    name: Tests
+    name: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
 
       - name: Run tests
         run: cargo test --all-features
 
-  # ── 4. Build ─────────────────────────────────────────────────────
+  # ── 4. Build ─────────────────────────────────────────────────────────────────
   build:
-    name: Build
+    name: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
 
       - name: Build
         run: cargo build
 
-  # ── 5. Documentation (nightly, docsrs cfg) ──────────────────────
+  # ── 5. Documentation (nightly, docsrs cfg) ──────────────────────────────────
   doc:
-    name: Documentation
+    name: doc
     runs-on: ubuntu-latest
-    env:
-      RUSTDOCFLAGS: --cfg docsrs -D warnings
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
 
       - name: Build docs
         run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: --cfg docsrs -D warnings
 
-  # ── 6. Nushell integration tests ────────────────────────────────
+  # ── 6. Nushell integration tests ────────────────────────────────────────────
   test-nu:
-    name: Nushell Tests
+    name: test-nu
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Install nushell
         run: |
-          cargo install nu --locked
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Run nushell test suite
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Nushell
+        run: cargo install nu --locked
+
+      - name: Run Nu script tests
         run: nu scripts/tests/run_all.nu

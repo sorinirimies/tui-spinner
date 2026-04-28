@@ -1,29 +1,29 @@
-# tui-spinner - task runner
+# tui-spinner — task runner
 # Install just:      cargo install just
 # Install git-cliff: cargo install git-cliff
 # Install vhs:       brew install vhs  OR  go install github.com/charmbracelet/vhs@latest
 # Usage: just <task>
-# -- Default ---------------------------------------------------------------
+# ── Default ───────────────────────────────────────────────────────────────────
 
 default:
     @just --list
 
-# -- Tool checks -----------------------------------------------------------
+# ── Tool checks ───────────────────────────────────────────────────────────────
 
 _check-git-cliff:
     @command -v git-cliff >/dev/null 2>&1 || { \
-        echo "git-cliff not found. Install with: cargo install git-cliff"; exit 1; \
+        echo "❌ git-cliff not found. Install with: cargo install git-cliff"; exit 1; \
     }
 
 # Check nu (nushell) is available
 _check-nu:
     @command -v nu >/dev/null 2>&1 || { \
-        echo "nu (nushell) not found. Install: https://www.nushell.sh"; exit 1; \
+        echo "❌ nu (nushell) not found. Install: https://www.nushell.sh"; exit 1; \
     }
 
 _check-vhs:
     @command -v vhs >/dev/null 2>&1 || { \
-        echo "vhs not found."; \
+        echo "❌ vhs not found."; \
         echo "   macOS:      brew install vhs"; \
         echo "   Any:        go install github.com/charmbracelet/vhs@latest"; \
         exit 1; \
@@ -31,12 +31,12 @@ _check-vhs:
 
 # Install all recommended development tools
 install-tools:
-    @echo "Installing development tools..."
-    @command -v git-cliff >/dev/null 2>&1 || cargo install git-cliff
-    @command -v nu >/dev/null 2>&1 && echo "nu found" || echo "nu (nushell) not found. Install: https://www.nushell.sh"
-    @echo "All tools installed!"
+    @echo "Installing development tools…"
+    @command -v git-cliff >/dev/null 2>&1 || cargo install git-cliff --locked
+    @command -v nu >/dev/null 2>&1 || cargo install nu --locked
+    @echo "✅ All tools installed!"
 
-# -- Build -----------------------------------------------------------------
+# ── Build ─────────────────────────────────────────────────────────────────────
 
 # Build the library (dev)
 build:
@@ -46,27 +46,27 @@ build:
 build-release:
     cargo build --release
 
-# -- Run -------------------------------------------------------------------
+# ── Run ───────────────────────────────────────────────────────────────────────
 
 # Run the main spinner demo example
 run:
     cargo run --example spinner
 
-# -- Test ------------------------------------------------------------------
+# ── Test ──────────────────────────────────────────────────────────────────────
 
 # Run the Rust test suite
 test:
-    cargo test
+    cargo test --all-features
 
 # Run Nu script tests
 test-nu: _check-nu
     nu scripts/tests/run_all.nu
 
 # Run both Rust and Nu tests
-test-all: test test-nu
-    @echo "All Rust and Nu tests passed!"
+test-all-nu: test test-nu
+    @echo "✅ All Rust and Nu tests passed!"
 
-# -- Code quality ----------------------------------------------------------
+# ── Code quality ──────────────────────────────────────────────────────────────
 
 # Check without building
 check:
@@ -82,13 +82,20 @@ fmt-check:
 
 # Run clippy
 clippy:
-    cargo clippy -- -D warnings
+    cargo clippy --all-features -- -D warnings
 
-# Run all quality checks (fmt, clippy, test) - must pass before a release
-check-all: fmt-check clippy test
-    @echo "All checks passed!"
+# Run all quality checks (format, clippy, test, nu) — must pass before a release.
+# Auto-formats first, then verifies no changes remain (catches unstaged format diffs).
+check-all: fmt clippy test test-nu
+    @echo "🔍 Verifying formatting is clean…"
+    cargo fmt --check
+    @echo "✅ All checks passed!"
 
-# -- VHS Demo GIFs --------------------------------------------------------
+# Full pre-release quality gate — everything in check-all plus a release build.
+check-release: check-all build-release
+    @echo "✅ Release quality gate passed (fmt + clippy + test + nu + release build)!"
+
+# ── VHS Demo GIFs ─────────────────────────────────────────────────────────────
 
 VHS_DIR := "examples/vhs"
 VHS_GENERATED := "examples/vhs/generated"
@@ -98,18 +105,18 @@ vhs-all: _check-vhs
     @mkdir -p {{ VHS_GENERATED }}
     @echo "=== tui-spinner VHS Tapes ==="
     @for tape in {{ VHS_DIR }}/*.tape; do \
-        echo ">>  $$tape"; \
-        vhs "$$tape" || echo "Failed: $$tape"; \
+        echo "▶  $$tape"; \
+        vhs "$$tape" || echo "❌ Failed: $$tape"; \
     done
-    @echo "Demo GIFs generated -> {{ VHS_GENERATED }}/"
+    @echo "✅ Demo GIFs generated → {{ VHS_GENERATED }}/"
 
 # Render a single tape by name, e.g.: just vhs-tape spinner-demo
 vhs-tape name: _check-vhs
     @if [ -f "{{ VHS_DIR }}/{{ name }}.tape" ]; then \
-        echo ">>  {{ VHS_DIR }}/{{ name }}.tape"; \
-        vhs "{{ VHS_DIR }}/{{ name }}.tape" && echo "Done."; \
+        echo "▶  {{ VHS_DIR }}/{{ name }}.tape"; \
+        vhs "{{ VHS_DIR }}/{{ name }}.tape" && echo "✅ Done."; \
     else \
-        echo "Tape not found: {{ name }}.tape"; \
+        echo "❌ Tape not found: {{ name }}.tape"; \
         echo ""; \
         just vhs-list; \
         exit 1; \
@@ -117,53 +124,65 @@ vhs-tape name: _check-vhs
 
 # List all available VHS tapes and any already-generated GIFs
 vhs-list:
-    @echo "Tapes  ->  {{ VHS_DIR }}/"
+    @echo "Tapes  →  {{ VHS_DIR }}/"
     @ls {{ VHS_DIR }}/*.tape 2>/dev/null | sed 's|.*/||; s|\.tape||' | sed 's/^/  /' || echo "  (none)"
     @echo ""
-    @echo "Generated  ->  {{ VHS_GENERATED }}/"
+    @echo "Generated  →  {{ VHS_GENERATED }}/"
     @ls {{ VHS_GENERATED }}/*.gif 2>/dev/null | sed 's|.*/||' | sed 's/^/  /' || echo "  (none yet)"
 
 # Pull GIF files from Git LFS (run once after a fresh clone)
 lfs-pull:
     @command -v git-lfs >/dev/null 2>&1 || { \
-        echo "git-lfs not found. Install with: brew install git-lfs"; exit 1; \
+        echo "❌ git-lfs not found. Install with: brew install git-lfs"; exit 1; \
     }
     git lfs pull
-    @echo "LFS objects pulled."
+    @echo "✅ LFS objects pulled."
 
-# -- Documentation ---------------------------------------------------------
+# ── Documentation ─────────────────────────────────────────────────────────────
 
 # Generate and open docs in browser
 doc:
     cargo doc --no-deps --open
 
-# -- Changelog -------------------------------------------------------------
+# ── Changelog ─────────────────────────────────────────────────────────────────
 
 # Regenerate the full CHANGELOG.md from all tags
 changelog: _check-git-cliff
-    @echo "Generating full changelog..."
+    @echo "Generating full changelog…"
     git-cliff --output CHANGELOG.md
-    @echo "CHANGELOG.md updated."
+    @echo "✅ CHANGELOG.md updated."
 
 # Prepend only unreleased commits to CHANGELOG.md
 changelog-unreleased: _check-git-cliff
     git-cliff --unreleased --prepend CHANGELOG.md
-    @echo "Unreleased changes prepended."
+    @echo "✅ Unreleased changes prepended."
 
 # Preview changelog for the next release without writing the file
 changelog-preview: _check-git-cliff
     @git-cliff --unreleased
 
-# -- Version bump ----------------------------------------------------------
-# Usage: just bump 0.2.0
-#
-# Runs fmt -> clippy -> test -> changelog -> commit -> tag, then shows push hints.
+# ── Version bump ──────────────────────────────────────────────────────────────
+
+# Validate that a version string will produce a valid vX.Y.Z tag.
+validate-tag version: _check-nu
+    @nu scripts/ci/validate_tag.nu "v{{ version }}" 2>&1 >/dev/null
+
+# Fail fast if the requested version is the same as the current one.
+_check-version-changed version: _check-nu
+    #!/usr/bin/env sh
+    current=$(nu scripts/version.nu)
+    if [ "$current" = "{{ version }}" ]; then
+        echo "❌ Version {{ version }} is already the current version. Nothing to bump."
+        exit 1
+    fi
+    echo "✅ Version will change: $current → {{ version }}"
 
 # Bump the version, regenerate Cargo.lock + CHANGELOG.md, commit and tag.
-bump version: check-all _check-git-cliff _check-nu
+# Validation runs first (cheap), quality gate runs second (expensive).
+bump version: (validate-tag version) (_check-version-changed version) check-release _check-git-cliff
     nu scripts/bump_version.nu --yes {{ version }}
 
-# -- Publish (crates.io) --------------------------------------------------
+# ── Publish (crates.io) ───────────────────────────────────────────────────────
 
 # Run the full pre-publish readiness check (fmt, clippy, tests, docs, dry-run)
 check-publish: _check-nu
@@ -179,15 +198,14 @@ publish: check-all
 
 # Show what would be released without making any changes
 release-preview: _check-git-cliff
-    @echo "Current version:"
-    @just version
+    @echo "Current version: $(just version)"
     @echo ""
     @echo "Unreleased commits:"
     @git-cliff --unreleased
     @echo ""
     @echo "Published crate:  tui-spinner"
 
-# -- Housekeeping ----------------------------------------------------------
+# ── Housekeeping ──────────────────────────────────────────────────────────────
 
 # Remove build artifacts
 clean:
@@ -199,17 +217,17 @@ update:
 
 # Update dependencies, run the full quality gate, then commit and push if all green.
 update-deps:
-    @echo "Updating dependencies..."
+    @echo "⬆️  Updating dependencies…"
     cargo update
-    @echo "Running quality gate..."
+    @echo "🔍 Running quality gate…"
     cargo fmt --check
-    cargo clippy -- -D warnings
-    cargo test
-    @echo "All checks passed - committing dependency updates..."
+    cargo clippy --all-features -- -D warnings
+    cargo test --all-features
+    @echo "✅ All checks passed — committing dependency updates…"
     git add Cargo.lock
     git diff --cached --quiet || git commit -m "chore: update dependencies"
     git push origin main
-    @echo "Dependency updates pushed to GitHub."
+    @echo "✅ Dependency updates pushed to GitHub."
 
 # Show outdated dependencies (requires cargo-outdated)
 outdated:
@@ -219,25 +237,25 @@ outdated:
 version: _check-nu
     @nu scripts/version.nu
 
-# -- Git remotes -----------------------------------------------------------
-
 # Show all configured remotes
 remotes:
     @git remote -v
 
-# Push main branch to GitHub
+# ── Git remotes & pushing ─────────────────────────────────────────────────────
+
+# Push the current branch to GitHub (origin)
 push:
     git push origin main
 
-# Push main branch to Gitea
+# Push the current branch to Gitea
 push-gitea:
     git push gitea main
 
-# Push main branch to Gitea Starscream
+# Push the current branch to Gitea Starscream
 push-gitea-starscream:
     git push gitea_starscream main
 
-# Push main to all remotes (continues on failure)
+# Push the current branch to all remotes (continues on failure)
 push-all:
     #!/usr/bin/env sh
     failed=""
@@ -292,10 +310,6 @@ pull-all:
 push-tags:
     git push origin --tags
 
-# Push tags to Gitea
-push-tags-gitea:
-    git push gitea --tags
-
 # Push all tags to all remotes (continues on failure)
 push-tags-all:
     #!/usr/bin/env sh
@@ -309,7 +323,42 @@ push-tags-all:
         echo "✅ Tags pushed to all remotes!"
     fi
 
-# Push the latest commit + tags to every remote (quality-gated; continues on failure)
+# ── Release workflows ─────────────────────────────────────────────────────────
+
+# Bump, commit, tag, then push to GitHub — triggers Release workflow.
+release version: (bump version)
+    @echo "Pushing release v{{ version }} to GitHub…"
+    git push --follow-tags origin main
+    @echo "✅ Release v{{ version }} pushed — Release workflow will trigger automatically."
+    @echo "   https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]//' | sed 's/\.git//')/actions"
+
+# Bump, commit, tag, then push to Gitea only.
+release-gitea version: (bump version)
+    @echo "Pushing release v{{ version }} to Gitea…"
+    git push --follow-tags gitea main
+    @echo "✅ Release v{{ version }} live on Gitea."
+
+# Bump, commit, tag, then push to Gitea Starscream only.
+release-gitea-starscream version: (bump version)
+    @echo "Pushing release v{{ version }} to Gitea Starscream…"
+    git push --follow-tags gitea_starscream main
+    @echo "✅ Release v{{ version }} live on Gitea Starscream."
+
+# Bump, commit, tag, then push to all remotes (continues on failure).
+release-all version: (bump version)
+    #!/usr/bin/env sh
+    echo "Pushing release v{{ version }} to all remotes…"
+    failed=""
+    git push --follow-tags origin main             || failed="$failed origin"
+    git push --follow-tags gitea main              || failed="$failed gitea"
+    git push --follow-tags gitea_starscream main   || failed="$failed gitea_starscream"
+    if [ -n "$failed" ]; then
+        echo "⚠️  Release v{{ version }} failed to push to:$failed"
+    else
+        echo "✅ Release v{{ version }} pushed to GitHub, Gitea, and Gitea Starscream!"
+    fi
+
+# Push the latest commit and all tags to every remote (no bump, continues on failure).
 push-release-all: check-all
     #!/usr/bin/env sh
     failed=""
@@ -322,50 +371,14 @@ push-release-all: check-all
         echo "✅ Latest commit + tags pushed to all remotes."
     fi
 
-# -- Release workflows -----------------------------------------------------
-
-# Bump, commit, tag, then push to GitHub — triggers Release workflow
-release version: (bump version)
-    @echo "Pushing release v{{ version }} to GitHub..."
-    git push --follow-tags origin main
-    @echo "✅ Release v{{ version }} pushed — Release workflow will trigger automatically."
-
-# Bump, commit, tag, then push to Gitea only
-release-gitea version: (bump version)
-    @echo "Pushing release v{{ version }} to Gitea..."
-    git push --follow-tags gitea main
-    @echo "✅ Release v{{ version }} live on Gitea."
-
-# Bump, commit, tag, then push to Gitea Starscream only
-release-gitea-starscream version: (bump version)
-    @echo "Pushing release v{{ version }} to Gitea Starscream..."
-    git push --follow-tags gitea_starscream main
-    @echo "✅ Release v{{ version }} live on Gitea Starscream."
-
-# Bump, commit, tag, then push to all remotes (continues on failure)
-release-all version: (bump version)
-    #!/usr/bin/env sh
-    echo "Pushing release v{{ version }} to all remotes..."
-    failed=""
-    git push --follow-tags origin main             || failed="$failed origin"
-    git push --follow-tags gitea main              || failed="$failed gitea"
-    git push --follow-tags gitea_starscream main   || failed="$failed gitea_starscream"
-    if [ -n "$failed" ]; then
-        echo "⚠️  Release v{{ version }} failed to push to:$failed"
-    else
-        echo "✅ Release v{{ version }} pushed to GitHub, Gitea, and Gitea Starscream!"
-    fi
-
-# Manually re-trigger the Release workflow for an existing tag via the gh CLI
+# Manually re-trigger the Release workflow for an existing tag via the gh CLI.
 release-retrigger version:
     @command -v gh >/dev/null 2>&1 || { \
-        echo "GitHub CLI (gh) not found. Install from https://cli.github.com"; exit 1; \
+        echo "❌ GitHub CLI (gh) not found. Install from https://cli.github.com"; exit 1; \
     }
-    @echo "Manually dispatching Release workflow for tag v{{ version }}..."
+    @echo "Manually dispatching Release workflow for tag v{{ version }}…"
     gh workflow run release.yml --field tag=v{{ version }}
-    @echo "✅ Dispatched — check progress in GitHub Actions."
-
-# -- Gitea sync ------------------------------------------------------------
+    @echo "✅ Dispatched — check progress at: https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions"
 
 # Force-sync Gitea with GitHub
 sync-gitea:
@@ -393,15 +406,11 @@ sync-all-gitea:
         echo "✅ All Gitea instances force-synced with GitHub."
     fi
 
-# -- Gitea setup -----------------------------------------------------------
+# ── Gitea setup ───────────────────────────────────────────────────────────────
 
-# Add or update the 'gitea' remote (usage: just setup-gitea <url>)
+# Add a Gitea remote and optionally push — interactive (nu script)
 setup-gitea url: _check-nu
-    nu scripts/setup_gitea.nu --remote gitea {{ url }}
-
-# Add or update the 'gitea_starscream' remote (usage: just setup-gitea-starscream <url>)
-setup-gitea-starscream url: _check-nu
-    nu scripts/setup_gitea.nu --remote gitea_starscream {{ url }}
+    nu scripts/setup_gitea.nu {{ url }}
 
 # Migrate this project to dual GitHub + Gitea hosting (interactive)
 migrate-gitea: _check-nu

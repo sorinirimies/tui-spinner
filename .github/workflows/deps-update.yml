@@ -11,11 +11,9 @@ name: Dependency Update
 
 on:
   schedule:
-    # Run every day at 02:00 UTC.
     - cron: "0 2 * * *"
   workflow_dispatch:
 
-# Only one dependency-update run at a time.
 concurrency:
   group: deps-update
   cancel-in-progress: true
@@ -29,18 +27,15 @@ permissions:
   pull-requests: write
 
 jobs:
-  # ── Upgrade, verify, and open PR ─────────────────────────────────
   deps-update:
     name: Upgrade dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          # Use a PAT so the created PR can trigger CI workflows.
           token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      # ── Toolchain ────────────────────────────────────────────────
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -48,31 +43,26 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # ── Install cargo-edit (provides `cargo upgrade`) ────────────
       - name: Install cargo-edit
         run: |
           cargo install cargo-edit --locked
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      # ── Pre-warm the registry ────────────────────────────────────
-      - name: Pre-warm registry
+      - name: Pre-warm cargo registry (refresh index + fetch sources)
         run: |
           cargo update
           cargo fetch
 
-      # ── Upgrade dependencies ─────────────────────────────────────
-      - name: Upgrade dependencies
-        run: |
-          # Upgrade to latest versions, including incompatible bumps.
-          cargo upgrade --incompatible allow
-          # Re-resolve the lock file after the upgrades.
-          cargo update
+      - name: Upgrade workspace dependency pins
+        run: cargo upgrade --incompatible allow
 
-      # ── Check for changes ────────────────────────────────────────
+      - name: Sync Cargo.lock
+        run: cargo update
+
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet; then
+          if git diff --quiet Cargo.toml Cargo.lock; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "ℹ️  No dependency changes detected."
           else
@@ -81,7 +71,6 @@ jobs:
             git diff --stat
           fi
 
-      # ── Quality gate — only if something changed ─────────────────
       - name: Check formatting
         if: steps.changes.outputs.changed == 'true'
         run: cargo fmt --check
@@ -94,7 +83,6 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         run: cargo test --all-features
 
-      # ── Create pull request ──────────────────────────────────────
       - name: Create pull request
         if: steps.changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
@@ -125,11 +113,10 @@ jobs:
             dependencies
             automated
 
-      # ── Auto-merge the PR ────────────────────────────────────────
       - name: Enable auto-merge
         if: steps.changes.outputs.changed == 'true' && steps.cpr.outputs.pull-request-number
         run: |
-          echo "🔀 Enabling auto-merge for PR #${{ steps.cpr.outputs.pull-request-number }}..."
+          echo "🔀 Enabling auto-merge for PR #${{ steps.cpr.outputs.pull-request-number }}…"
           gh pr merge "${{ steps.cpr.outputs.pull-request-number }}" \
             --auto --squash --delete-branch || {
               echo "⚠️  Auto-merge could not be enabled (branch protection may not be configured)."

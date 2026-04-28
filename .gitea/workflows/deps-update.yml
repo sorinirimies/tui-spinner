@@ -1,30 +1,17 @@
-# ─────────────────────────────────────────────────────────────────────
-#  Nightly Dependency Upgrade — tui-spinner (Gitea Actions)
-#  Runs daily at 02:30 UTC.  Upgrades dependency pins via cargo-edit,
-#  refreshes Cargo.lock, passes the quality gate, then pushes directly
-#  to main.
-#
-#  Pure-Rust library — no system libraries needed.
-#
-#  Schedule: every day at 02:30 UTC (offset from GitHub's 02:00).
-#  Can also be triggered manually via workflow_dispatch.
-# ─────────────────────────────────────────────────────────────────────
-
 name: Nightly Dependency Upgrade
 
 on:
   schedule:
-    # Run every day at 02:30 UTC (offset from GitHub's 02:00).
+    # Runs at 02:30 UTC every day (offset from GitHub's 02:00)
     - cron: "30 2 * * *"
   workflow_dispatch:
 
-# Only one dependency-update run at a time.
+env:
+  CARGO_TERM_COLOR: always
+
 concurrency:
   group: deps-update
   cancel-in-progress: true
-
-env:
-  CARGO_TERM_COLOR: always
 
 jobs:
   upgrade-deps:
@@ -48,24 +35,17 @@ jobs:
 
       # ── cargo-edit (provides `cargo upgrade`) ────────────────────────────────
       - name: Install cargo-edit
-        run: |
-          cargo install cargo-edit --locked
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        run: cargo install cargo-edit --locked
 
-      # ── Pre-warm the registry ─────────────────────────────────────────────────
+      # ── Pre-warm cargo registry ──────────────────────────────────────────────
       # `cargo upgrade`'s resolver can fail if previously-cached package versions
       # have been yanked.  Running `cargo update` first refreshes the index and
       # `cargo fetch` downloads the resolved sources so the offline phase has
       # valid candidates for every transitive dependency.
       - name: Pre-warm cargo registry (refresh index + fetch sources)
-        run: |
-          cargo update
-          cargo fetch
+        run: cargo update && cargo fetch
 
       # ── Upgrade all dependency pins ──────────────────────────────────────────
-      # `cargo upgrade --incompatible allow` rewrites version constraints in
-      # Cargo.toml so pinned libs can advance to new major versions.
-      # `cargo update` then resolves the new constraints into Cargo.lock.
       - name: Upgrade workspace dependency pins
         run: cargo upgrade --incompatible allow
 
@@ -85,21 +65,20 @@ jobs:
             git diff --stat
           fi
 
-      # ── Quality gate — only if something changed ─────────────────────────────
+      # ── Quality gate ─────────────────────────────────────────────────────────
       - name: Check formatting
         if: steps.check.outputs.has_changes == 'true'
         run: cargo fmt --check
 
-      - name: Clippy
+      - name: Run clippy
         if: steps.check.outputs.has_changes == 'true'
         run: cargo clippy --all-features -- -D warnings
 
-      - name: Tests
+      - name: Run tests
         if: steps.check.outputs.has_changes == 'true'
         run: cargo test --all-features
 
       # ── Commit and push directly to main ─────────────────────────────────────
-      # Quality gate already passed — safe to push directly.
       - name: Commit and push dependency updates
         if: steps.check.outputs.has_changes == 'true'
         run: |
