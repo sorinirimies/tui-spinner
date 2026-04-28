@@ -78,6 +78,8 @@ use crate::Spin;
 /// | `HALF`      | `▀ ▐ ▄ ▌`                     | 4      | Half-block rotating clockwise |
 /// | `SQUARE`    | `◰ ◳ ◲ ◱`                     | 4      | White square, one filled quadrant   |
 /// | `DICE`      | `⚀ ⚁ ⚂ ⚃ ⚄ ⚅`               | 6      | Dice faces one to six         |
+/// | `BAR`       | `▁ ▂ ▃ ▄ ▅ ▆ ▇ █`             | 8      | Sub-block growing bar         |
+/// | `CORNERS`   | `┌ ┐ ┘ └`                     | 4      | Box-drawing corners rotate    |
 ///
 /// # Examples
 ///
@@ -163,6 +165,18 @@ impl FluxFrames {
     ///
     /// `⚀ ⚁ ⚂ ⚃ ⚄ ⚅`
     pub const DICE: &'static [char] = &['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+
+    /// Eight sub-block glyphs growing from one-eighth to full height.
+    ///
+    /// `▁ ▂ ▃ ▄ ▅ ▆ ▇ █`
+    ///
+    /// Clockwise runs the bar upward; counter-clockwise shrinks it back down.
+    pub const BAR: &'static [char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+    /// Box-drawing corners rotating clockwise.
+    ///
+    /// `┌ ┐ ┘ └`
+    pub const CORNERS: &'static [char] = &['┌', '┐', '┘', '└'];
 }
 
 // ── Public widget ─────────────────────────────────────────────────────────────
@@ -545,6 +559,8 @@ mod tests {
         assert!(!FluxFrames::MOON.is_empty());
         assert!(!FluxFrames::TRIANGLES.is_empty());
         assert!(!FluxFrames::PULSE.is_empty());
+        assert!(!FluxFrames::BAR.is_empty());
+        assert!(!FluxFrames::CORNERS.is_empty());
     }
 
     #[test]
@@ -564,6 +580,8 @@ mod tests {
             ("HALF", FluxFrames::HALF),
             ("SQUARE", FluxFrames::SQUARE),
             ("DICE", FluxFrames::DICE),
+            ("BAR", FluxFrames::BAR),
+            ("CORNERS", FluxFrames::CORNERS),
         ] {
             let unique: std::collections::HashSet<char> = preset.iter().copied().collect();
             assert_eq!(unique.len(), preset.len(), "{name} has duplicate chars");

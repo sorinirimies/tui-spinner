@@ -1,11 +1,11 @@
 //! # FluxSpinner Example
 //!
-//! Displays all [`FluxFrames`] presets in a **4 × 4 grid** (14 presets +
-//! 2 live custom-frames tiles).  Every tile shows the preset name, the
+//! Displays all [`FluxFrames`] presets in a compact **5 × 4 grid** (16 presets +
+//! 4 live custom-frames tiles).  Every tile shows the preset name, the
 //! CW ↻ and CCW ↺ animated glyphs side by side, the full frame sequence,
 //! and the frame count.
 //!
-//! The two **CUSTOM** tiles demonstrate passing any `&'static [char]` slice
+//! The four **CUSTOM** tiles demonstrate passing any `&'static [char]` slice
 //! directly to [`.frames()`](tui_spinner::FluxSpinner::frames).
 //!
 //! **Controls:** `q` / `Esc` — Quit
@@ -115,6 +115,12 @@ const PRESETS: &[(&[char], &str, &str, Color)] = &[
     (FluxFrames::BLOCK, "BLOCK", "▖ ▘ ▝ ▗", Color::LightGreen),
     (FluxFrames::ARC, "ARC", "◜ ◝ ◞ ◟", Color::LightCyan),
     (
+        FluxFrames::CORNERS,
+        "CORNERS",
+        "┌ ┐ ┘ └",
+        Color::Rgb(200, 200, 100),
+    ),
+    (
         FluxFrames::CLOCK,
         "CLOCK",
         "◷ ◶ ◵ ◴",
@@ -162,6 +168,12 @@ const PRESETS: &[(&[char], &str, &str, Color)] = &[
         "⚀ ⚁ ⚂ ⚃ ⚄ ⚅",
         Color::Rgb(255, 220, 100),
     ),
+    (
+        FluxFrames::BAR,
+        "BAR",
+        "▁ ▂ ▃ ▄ ▅ ▆ ▇ █",
+        Color::Rgb(160, 255, 160),
+    ),
 ];
 
 /// Live custom-frame tiles — demonstrate `.frames(&[…])` with arbitrary slices.
@@ -177,6 +189,18 @@ const CUSTOM_TILES: &[(&[char], &str, &str, Color)] = &[
         "ALPHA",
         "a b c d e f g h",
         Color::Rgb(180, 255, 180),
+    ),
+    (
+        &['░', '▒', '▓', '█'],
+        "SHADE",
+        "░ ▒ ▓ █",
+        Color::Rgb(200, 180, 255),
+    ),
+    (
+        &['♩', '♪', '♫', '♬'],
+        "MUSIC",
+        "♩ ♪ ♫ ♬",
+        Color::Rgb(255, 180, 220),
     ),
 ];
 
@@ -243,29 +267,34 @@ fn render_footer(frame: &mut Frame, area: Rect) {
     );
 }
 
-// ── 4 × 3 grid ────────────────────────────────────────────────────────────────
+// ── 5 × 4 compact grid ────────────────────────────────────────────────────────
+//
+// Each cell row is exactly 5 terminal rows tall (2 borders + 3 content rows).
+// Remaining vertical space sits below the grid.
+
+const GRID_ROWS: usize = 5;
+const GRID_COLS: usize = 4;
 
 fn render_grid(frame: &mut Frame, area: Rect, tick: u64) {
-    // 4 rows × 4 cols = 16 cells: 14 preset tiles + 2 custom tiles.
-    let rows = Layout::vertical([
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-        Constraint::Ratio(1, 4),
-    ])
-    .split(area);
+    // Fixed-height rows so cells are always compact regardless of terminal size.
+    let row_constraints: Vec<Constraint> = (0..GRID_ROWS)
+        .map(|_| Constraint::Length(5))
+        .chain(std::iter::once(Constraint::Min(0)))
+        .collect();
 
-    for (row_idx, &row_area) in rows.iter().enumerate() {
-        let cols = Layout::horizontal([
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
-        ])
-        .split(row_area);
+    let col_constraints: Vec<Constraint> = (0..GRID_COLS)
+        .map(|_| Constraint::Ratio(1, GRID_COLS as u32))
+        .collect();
 
-        for (col_idx, &col_area) in cols.iter().enumerate() {
-            let idx = row_idx * 4 + col_idx;
+    let rows = Layout::vertical(row_constraints).split(area);
+
+    for row_idx in 0..GRID_ROWS {
+        let cols = Layout::horizontal(col_constraints.clone()).split(rows[row_idx]);
+
+        for col_idx in 0..GRID_COLS {
+            let col_area = cols[col_idx];
+            let idx = row_idx * GRID_COLS + col_idx;
+
             if idx < PRESETS.len() {
                 let (frames, name, glyphs, color) = PRESETS[idx];
                 render_tile(frame, col_area, tick, frames, name, glyphs, color);
@@ -300,11 +329,16 @@ fn render_tile(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Divide inner into three equal horizontal bands.
-    let [spinners_area, glyphs_area, count_area] = Layout::vertical([
-        Constraint::Ratio(1, 3),
-        Constraint::Ratio(1, 3),
-        Constraint::Ratio(1, 3),
+    if inner.height == 0 {
+        return;
+    }
+
+    // Three compact 1-row content bands — no padding needed at cell height 5.
+    let [spinner_row, glyph_row, count_row, _] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Min(0),
     ])
     .areas(inner);
 
@@ -314,24 +348,27 @@ fn render_tile(
     let accent = Style::default().fg(color);
     let bold_accent = accent.add_modifier(Modifier::BOLD);
 
-    // Band 1 — animated CW and CCW glyphs.
-    let spinner_line = Line::from(vec![
-        Span::styled("↻ ", dim),
-        Span::styled(cw.to_string(), bold_accent),
-        Span::styled("   ", dim),
-        Span::styled(ccw.to_string(), bold_accent),
-        Span::styled(" ↺", dim),
-    ]);
-    render_vcenter(frame, spinners_area, spinner_line);
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled("↻ ", dim),
+            Span::styled(cw.to_string(), bold_accent),
+            Span::styled("  ", dim),
+            Span::styled(ccw.to_string(), bold_accent),
+            Span::styled(" ↺", dim),
+        ]))
+        .alignment(Alignment::Center),
+        spinner_row,
+    );
 
-    // Band 2 — full frame sequence.
-    render_vcenter(frame, glyphs_area, Line::from(Span::styled(glyphs, accent)));
+    frame.render_widget(
+        Paragraph::new(Span::styled(glyphs, accent)).alignment(Alignment::Center),
+        glyph_row,
+    );
 
-    // Band 3 — frame count.
-    render_vcenter(
-        frame,
-        count_area,
-        Line::from(Span::styled(format!("· {} frames ·", frames.len()), dim)),
+    frame.render_widget(
+        Paragraph::new(Span::styled(format!("· {} frames ·", frames.len()), dim))
+            .alignment(Alignment::Center),
+        count_row,
     );
 }
 
@@ -346,7 +383,6 @@ fn render_custom_tile(
 ) {
     let dim = Style::default().fg(Color::DarkGray);
 
-    // Dashed border to visually distinguish custom tiles from preset tiles.
     let block = Block::bordered()
         .title(format!(" {name} · custom "))
         .title_alignment(Alignment::Center)
@@ -356,10 +392,15 @@ fn render_custom_tile(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let [spinners_area, glyphs_area, hint_area] = Layout::vertical([
-        Constraint::Ratio(1, 3),
-        Constraint::Ratio(1, 3),
-        Constraint::Ratio(1, 3),
+    if inner.height == 0 {
+        return;
+    }
+
+    let [spinner_row, glyph_row, hint_row, _] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Min(0),
     ])
     .areas(inner);
 
@@ -368,37 +409,29 @@ fn render_custom_tile(
     let accent = Style::default().fg(color);
     let bold_accent = accent.add_modifier(Modifier::BOLD);
 
-    render_vcenter(
-        frame,
-        spinners_area,
-        Line::from(vec![
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
             Span::styled("↻ ", dim),
             Span::styled(cw.to_string(), bold_accent),
-            Span::styled("   ", dim),
+            Span::styled("  ", dim),
             Span::styled(ccw.to_string(), bold_accent),
             Span::styled(" ↺", dim),
-        ]),
+        ]))
+        .alignment(Alignment::Center),
+        spinner_row,
     );
-    render_vcenter(frame, glyphs_area, Line::from(Span::styled(glyphs, accent)));
-    render_vcenter(
-        frame,
-        hint_area,
-        Line::from(Span::styled(
-            format!(".frames(&[…])  {} frames", frames.len()),
+
+    frame.render_widget(
+        Paragraph::new(Span::styled(glyphs, accent)).alignment(Alignment::Center),
+        glyph_row,
+    );
+
+    frame.render_widget(
+        Paragraph::new(Span::styled(
+            format!(".frames(&[…]) · {} frames", frames.len()),
             dim,
-        )),
+        ))
+        .alignment(Alignment::Center),
+        hint_row,
     );
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Render `line` centred horizontally and vertically within `area`.
-fn render_vcenter(frame: &mut Frame, area: Rect, line: Line) {
-    let [_, center, _] = Layout::vertical([
-        Constraint::Min(0),
-        Constraint::Length(1),
-        Constraint::Min(0),
-    ])
-    .areas(area);
-    frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), center);
 }
