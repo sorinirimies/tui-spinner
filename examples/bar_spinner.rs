@@ -29,7 +29,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
-use tui_spinner::{BarSpinner, Spin};
+use tui_spinner::{BarSpinner, BarTrack, Spin};
 
 // ── Style macros ──────────────────────────────────────────────────────────────
 
@@ -360,11 +360,18 @@ fn render_thick_section(frame: &mut Frame, area: Rect, tick: u64) {
 // ── Right panel ───────────────────────────────────────────────────────────────
 
 fn render_right(frame: &mut Frame, area: Rect, tick: u64) {
-    let [pairs_area, arc_area] =
-        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(area);
+    let [pairs_area, arc_area, track_area, fade_area] = Layout::vertical([
+        Constraint::Ratio(1, 4),
+        Constraint::Ratio(1, 4),
+        Constraint::Ratio(1, 4),
+        Constraint::Ratio(1, 4),
+    ])
+    .areas(area);
 
     render_pairs_section(frame, pairs_area, tick);
     render_arc_section(frame, arc_area, tick);
+    render_track_section(frame, track_area, tick);
+    render_fade_section(frame, fade_area, tick);
 }
 
 // ── CW / CCW pairs ────────────────────────────────────────────────────────────
@@ -425,6 +432,96 @@ fn render_pairs_section(frame: &mut Frame, area: Rect, tick: u64) {
             tps,
             &format!("{label} ↺"),
         );
+    }
+}
+
+// ── Track styles ─────────────────────────────────────────────────────────────
+
+/// (track, label)
+const TRACK_CONFIGS: &[(BarTrack, &str)] = &[
+    (BarTrack::Rail, "Rail (default)  ⣀"),
+    (BarTrack::Full, "Full            ⣿"),
+    (BarTrack::Empty, "Empty           ⠀"),
+    (BarTrack::Custom(0x09), "Custom  0x09    ⠉"),
+];
+
+fn render_track_section(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = section_block!("Track style  .track(BarTrack::…)", Color::LightYellow);
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
+
+    let n = TRACK_CONFIGS.len();
+    let row_h = (inner.height / n as u16).max(1);
+    let constraints: Vec<Constraint> = (0..n)
+        .map(|_| Constraint::Length(row_h))
+        .chain([Constraint::Min(0)])
+        .collect();
+    let rows = Layout::vertical(constraints).split(inner);
+
+    for (i, &(track, label)) in TRACK_CONFIGS.iter().enumerate() {
+        if i >= rows.len().saturating_sub(1) {
+            break;
+        }
+        let row = rows[i];
+        let label_w = label.len() as u16 + 2;
+        let [spinner_area, label_area] =
+            Layout::horizontal([Constraint::Min(4), Constraint::Length(label_w)]).areas(row);
+
+        frame.render_widget(
+            BarSpinner::new(tick)
+                .height(1)
+                .track(track)
+                .arc_color(Color::Yellow)
+                .dim_color(Color::DarkGray)
+                .ticks_per_step(1),
+            spinner_area,
+        );
+        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); dim)), label_area);
+    }
+}
+
+// ── Fade width comparison ─────────────────────────────────────────────────────
+
+/// (fade_width, label)
+const FADE_CONFIGS: &[(usize, &str)] = &[
+    (0, "fade=0  sharp ⣿"),
+    (1, "fade=1  subtle"),
+    (2, "fade=2"),
+    (3, "fade=3  default ⠉⠛⠿⣿"),
+];
+
+fn render_fade_section(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = section_block!("Fade width  .fade_width(n)", Color::LightMagenta);
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
+
+    let n = FADE_CONFIGS.len();
+    let row_h = (inner.height / n as u16).max(1);
+    let constraints: Vec<Constraint> = (0..n)
+        .map(|_| Constraint::Length(row_h))
+        .chain([Constraint::Min(0)])
+        .collect();
+    let rows = Layout::vertical(constraints).split(inner);
+
+    for (i, &(fw, label)) in FADE_CONFIGS.iter().enumerate() {
+        if i >= rows.len().saturating_sub(1) {
+            break;
+        }
+        let row = rows[i];
+        let label_w = label.len() as u16 + 2;
+        let [spinner_area, label_area] =
+            Layout::horizontal([Constraint::Min(4), Constraint::Length(label_w)]).areas(row);
+
+        frame.render_widget(
+            BarSpinner::new(tick)
+                .height(1)
+                .fade_width(fw)
+                .arc_color(Color::Magenta)
+                .dim_color(Color::DarkGray)
+                .ticks_per_step(1),
+            spinner_area,
+        );
+        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); dim)), label_area);
     }
 }
 

@@ -9,18 +9,11 @@ Set Height 900
 Set FontSize 14
 Set PlaybackSpeed 1.0
 
+Hide
 Type "cargo run --example flux_spinner"
 Enter
-
-# Wait for compilation and startup
-Sleep 10s
-
-# Let all spinners animate through several full rotations
-Sleep 6s
-
-# Show the diagonal wave effect
-Sleep 4s
-
-# Quit
+Sleep 12s
+Show
+Sleep 8s
 Type "q"
-Sleep 1s
+Sleep 500ms

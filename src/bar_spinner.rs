@@ -51,7 +51,66 @@ const FADE: [u8; 4] = [0x09, 0x1B, 0x3F, 0xFF];
 /// `⣀` (0xC0) — bottom two dots only — gives a subtle rail behind the arc.
 const DIM_BYTE: u8 = 0xC0;
 
+// ── Track style ───────────────────────────────────────────────────────────────
+
+/// Controls the appearance of the dim background track behind the bouncing arc.
+///
+/// | Variant | Byte | Glyph | Effect |
+/// |---------|------|-------|--------|
+/// | `Rail`  | `0xC0` | `⣀` | Bottom-two-dot baseline — subtle, default |
+/// | `Full`  | `0xFF` | `⣿` | Full-density track in `dim_color` |
+/// | `Empty` | `0x00` | `⠀` | Invisible — arc floats on empty space |
+/// | `Custom(u8)` | any | any braille | User-defined braille byte |
+///
+/// # Examples
+///
+/// ```
+/// use tui_spinner::{BarSpinner, BarTrack};
+///
+/// let rail  = BarSpinner::new(0).track(BarTrack::Rail);    // ⣀ default
+/// let solid = BarSpinner::new(0).track(BarTrack::Full);    // ⣿ solid track
+/// let float = BarSpinner::new(0).track(BarTrack::Empty);   // ⠀ no track
+/// let dot   = BarSpinner::new(0).track(BarTrack::Custom(0x09)); // ⠉ top-row
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BarTrack {
+    /// `⣀` (0xC0) — bottom-two-dot rail, subtle baseline (default).
+    #[default]
+    Rail,
+    /// `⣿` (0xFF) — full-density track in `dim_color`.
+    Full,
+    /// `⠀` (0x00) — invisible background; the arc floats on empty space.
+    Empty,
+    /// Any custom braille byte.
+    Custom(u8),
+}
+
+impl BarTrack {
+    fn byte(self) -> u8 {
+        match self {
+            Self::Rail => DIM_BYTE,
+            Self::Full => 0xFF,
+            Self::Empty => 0x00,
+            Self::Custom(b) => b,
+        }
+    }
+}
+
 // ── Engine ────────────────────────────────────────────────────────────────────
+
+/// Map an edge distance to the appropriate [`FADE`] byte.
+///
+/// - `fade_width = 0` → no ramp; all arc cells use `FADE[3]` (full `⣿`).
+/// - `fade_width = 1` → only the outermost column fades.
+/// - `fade_width = 3` → default three-column ramp (`⠉ ⠛ ⠿ ⣿`).
+#[inline]
+fn fade_byte(from_edge: usize, fade_width: usize) -> u8 {
+    if fade_width == 0 || from_edge >= fade_width {
+        FADE[3]
+    } else {
+        FADE[(from_edge * 3).div_ceil(fade_width).min(2)]
+    }
+}
 
 /// Internal bounce engine operating in **character-column** space.
 ///
@@ -112,7 +171,13 @@ impl RectEngine {
     }
 
     /// Render the current frame as styled braille [`Line`]s.
-    fn render_lines(&self, arc_color: Color, dim_color: Color) -> Vec<Line<'static>> {
+    fn render_lines(
+        &self,
+        arc_color: Color,
+        dim_color: Color,
+        fade_width: usize,
+        track_byte: u8,
+    ) -> Vec<Line<'static>> {
         let arc_end = self.anchor + self.arc_cols;
 
         (0..self.char_h)
@@ -120,11 +185,10 @@ impl RectEngine {
                 let spans: Vec<Span<'static>> = (0..self.char_w)
                     .map(|ci| {
                         let (byte, color) = if ci >= self.anchor && ci < arc_end {
-                            // Distance from the nearer arc edge → fade index (0–3).
-                            let dist = (ci - self.anchor).min(arc_end - 1 - ci).min(3);
-                            (FADE[dist], arc_color)
+                            let from_edge = (ci - self.anchor).min(arc_end - 1 - ci);
+                            (fade_byte(from_edge, fade_width), arc_color)
                         } else {
-                            (DIM_BYTE, dim_color)
+                            (track_byte, dim_color)
                         };
                         let ch = char::from_u32(0x2800 + u32::from(byte)).unwrap_or('\u{2800}');
                         Span::styled(ch.to_string(), Style::default().fg(color))
@@ -158,7 +222,7 @@ impl RectEngine {
 /// use ratatui::style::Color;
 /// use ratatui::Frame;
 /// use ratatui::layout::Rect;
-/// use tui_spinner::{BarSpinner, Spin};
+/// use tui_spinner::{BarSpinner, BarTrack, Spin};
 ///
 /// fn draw(frame: &mut Frame, area: Rect, tick: u64) {
 ///     // Fills the full width of `area` — typical Zed/Claude style.
@@ -170,6 +234,13 @@ impl RectEngine {
 ///     );
 /// }
 /// ```
+///
+/// # Field Defaults
+///
+/// | Field           | Default                     |
+/// |-----------------|-----------------------------|
+/// | `track`         | [`BarTrack::Rail`]          |
+/// | `fade_width`    | `3`                         |
 #[derive(Debug, Clone)]
 pub struct BarSpinner<'a> {
     tick: u64,
@@ -187,6 +258,10 @@ pub struct BarSpinner<'a> {
     arc_color: Color,
     /// Colour of the dim background track glyph.
     dim_color: Color,
+    /// Background track style (default [`BarTrack::Rail`]).
+    track: BarTrack,
+    /// Fade ramp width in character columns (default 3; 0 = sharp cutoff).
+    fade_width: usize,
     block: Option<Block<'a>>,
     style: Style,
     alignment: Alignment,
@@ -215,6 +290,8 @@ impl<'a> BarSpinner<'a> {
             ticks_per_step: 1,
             arc_color: Color::Cyan,
             dim_color: Color::DarkGray,
+            track: BarTrack::Rail,
+            fade_width: 3,
             block: None,
             style: Style::default(),
             alignment: Alignment::Left,
@@ -343,6 +420,41 @@ impl<'a> BarSpinner<'a> {
         self
     }
 
+    /// Sets the background track style (default [`BarTrack::Rail`]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::{BarSpinner, BarTrack};
+    ///
+    /// let solid = BarSpinner::new(0).track(BarTrack::Full);
+    /// let float = BarSpinner::new(0).track(BarTrack::Empty);
+    /// ```
+    #[must_use]
+    pub fn track(mut self, track: BarTrack) -> Self {
+        self.track = track;
+        self
+    }
+
+    /// Sets the arc fade-ramp width in character columns (default `3`).
+    ///
+    /// `0` = sharp cutoff — the arc edge is a hard boundary.
+    /// `1`–`3` = progressively softer gradient (default `3` gives `⠉ ⠛ ⠿ ⣿`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::BarSpinner;
+    ///
+    /// let sharp = BarSpinner::new(0).fade_width(0);
+    /// let soft  = BarSpinner::new(0).fade_width(3); // default
+    /// ```
+    #[must_use]
+    pub fn fade_width(mut self, w: usize) -> Self {
+        self.fade_width = w;
+        self
+    }
+
     /// Wraps the spinner in a [`Block`].
     ///
     /// # Examples
@@ -407,7 +519,12 @@ impl<'a> BarSpinner<'a> {
             engine.walk();
         }
 
-        engine.render_lines(self.arc_color, self.dim_color)
+        engine.render_lines(
+            self.arc_color,
+            self.dim_color,
+            self.fade_width,
+            self.track.byte(),
+        )
     }
 }
 
@@ -554,7 +671,7 @@ mod tests {
     fn arc_edges_use_fade_bytes() {
         // Build a wide engine so there is a full-density centre.
         let e = RectEngine::build(20, 1, 12, Spin::Clockwise);
-        let lines = e.render_lines(Color::Cyan, Color::DarkGray);
+        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE);
         assert_eq!(lines.len(), 1);
         let spans = &lines[0].spans;
 
@@ -579,7 +696,7 @@ mod tests {
     #[test]
     fn dim_columns_use_dim_byte() {
         let e = RectEngine::build(20, 1, 6, Spin::Clockwise);
-        let lines = e.render_lines(Color::Cyan, Color::DarkGray);
+        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE);
         let spans = &lines[0].spans;
         let dim_char = char::from_u32(0x2800 + u32::from(DIM_BYTE)).unwrap();
         // Columns before the arc anchor should all be DIM_BYTE.
@@ -733,5 +850,22 @@ mod tests {
         assert_eq!(s.ticks_per_step, 3);
         assert_eq!(s.arc_color, Color::Blue);
         assert_eq!(s.dim_color, Color::Black);
+    }
+
+    #[test]
+    fn track_and_fade_width_builder() {
+        let s = BarSpinner::new(0).track(BarTrack::Full).fade_width(0);
+        assert_eq!(s.track, BarTrack::Full);
+        assert_eq!(s.fade_width, 0);
+
+        // Sharp fade: every arc cell should show full density (FADE[3] = 0xFF).
+        let lines = s.width(12).build_lines(12);
+        // All spans should be ⣿ (U+28FF) in arc_color OR ⣿ in dim_color (Full track).
+        for line in &lines {
+            for span in &line.spans {
+                let ch = span.content.chars().next().unwrap();
+                assert_eq!(ch, '\u{28FF}', "sharp fade + Full track → every cell is ⣿");
+            }
+        }
     }
 }

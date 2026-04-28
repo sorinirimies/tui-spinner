@@ -9,9 +9,11 @@ Set Height 900
 Set FontSize 14
 Set PlaybackSpeed 1.0
 
+Hide
 Type "cargo run --example linear_spinner"
 Enter
-Sleep 10s
-Sleep 6s
+Sleep 12s
+Show
+Sleep 8s
 Type "q"
-Sleep 1s
+Sleep 500ms

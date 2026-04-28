@@ -7,11 +7,13 @@ Set Theme "Catppuccin Mocha"
 Set Width 1400
 Set Height 900
 Set FontSize 14
-Set PlaybackSpeed 2.0
+Set PlaybackSpeed 1.5
 
+Hide
 Type "cargo run --example spinner"
 Enter
-Sleep 6s
-
+Sleep 12s
+Show
+Sleep 5s
 Type "q"
 Sleep 500ms
