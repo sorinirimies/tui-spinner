@@ -196,6 +196,39 @@ impl BarStyle {
     }
 }
 
+// ── Motion mode ───────────────────────────────────────────────────────────────
+
+/// Controls how the arc behaves when it reaches the edge of the bar.
+///
+/// | Variant  | Behaviour |
+/// |----------|-----------|
+/// | `Bounce` | Reverses at each edge — classic ping-pong (default) |
+/// | `Loop`   | Wraps around: when the arc exits one edge it re-enters from the other |
+///
+/// Combined with [`Spin`], `Loop` produces a continuous sweep:
+/// - `Spin::Clockwise` + `Loop` → sweeps left → right endlessly
+/// - `Spin::CounterClockwise` + `Loop` → sweeps right → left endlessly
+///
+/// # Examples
+///
+/// ```
+/// use tui_spinner::{BarSpinner, BarMotion, Spin};
+///
+/// // Default ping-pong
+/// let bounce = BarSpinner::new(0).motion(BarMotion::Bounce);
+///
+/// // Continuous left-to-right sweep
+/// let sweep = BarSpinner::new(0).spin(Spin::Clockwise).motion(BarMotion::Loop);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BarMotion {
+    /// Reverse at each edge — ping-pong (default).
+    #[default]
+    Bounce,
+    /// Wrap around: exit one edge and re-enter from the other.
+    Loop,
+}
+
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 /// Map an edge distance to the appropriate [`FADE`] byte.
@@ -224,10 +257,17 @@ struct RectEngine {
     /// Leftmost character column of the bright window.
     anchor: usize,
     going_forward: bool,
+    motion: BarMotion,
 }
 
 impl RectEngine {
-    fn build(char_w: usize, char_h: usize, arc_width: usize, spin: Spin) -> Self {
+    fn build(
+        char_w: usize,
+        char_h: usize,
+        arc_width: usize,
+        spin: Spin,
+        motion: BarMotion,
+    ) -> Self {
         let char_w = char_w.max(3);
         let char_h = char_h.max(1);
 
@@ -251,22 +291,42 @@ impl RectEngine {
             arc_cols,
             anchor,
             going_forward,
+            motion,
         }
     }
 
-    /// Advance one step, reversing at each edge.
+    /// Advance one step, reversing or wrapping at each edge.
     fn walk(&mut self) {
         let max_anchor = self.char_w.saturating_sub(self.arc_cols);
-        if self.going_forward {
-            if self.anchor < max_anchor {
-                self.anchor += 1;
-            } else {
-                self.going_forward = false;
+
+        match self.motion {
+            BarMotion::Bounce => {
+                if self.going_forward {
+                    if self.anchor < max_anchor {
+                        self.anchor += 1;
+                    } else {
+                        self.going_forward = false;
+                    }
+                } else if self.anchor > 0 {
+                    self.anchor -= 1;
+                } else {
+                    self.going_forward = true;
+                }
             }
-        } else if self.anchor > 0 {
-            self.anchor -= 1;
-        } else {
-            self.going_forward = true;
+            BarMotion::Loop => {
+                // Direction is fixed; wrap at the boundary instead of reversing.
+                if self.going_forward {
+                    if self.anchor < max_anchor {
+                        self.anchor += 1;
+                    } else {
+                        self.anchor = 0;
+                    }
+                } else if self.anchor > 0 {
+                    self.anchor -= 1;
+                } else {
+                    self.anchor = max_anchor;
+                }
+            }
         }
     }
 
@@ -359,6 +419,7 @@ impl RectEngine {
 /// | `fade_width`    | `3`                         |
 /// | `arc_byte`      | `0xFF` (`⣿`)               |
 /// | `bar_style`     | [`BarStyle::Braille`]       |
+/// | `motion`        | [`BarMotion::Bounce`]       |
 #[derive(Debug, Clone)]
 pub struct BarSpinner<'a> {
     tick: u64,
@@ -384,6 +445,8 @@ pub struct BarSpinner<'a> {
     arc_byte: u8,
     /// Symbol style for arc and track glyphs (default [`BarStyle::Braille`]).
     bar_style: BarStyle,
+    /// Arc motion mode (default [`BarMotion::Bounce`]).
+    motion: BarMotion,
     block: Option<Block<'a>>,
     style: Style,
     alignment: Alignment,
@@ -477,6 +540,7 @@ impl<'a> BarSpinner<'a> {
             fade_width: 3,
             arc_byte: 0xFF,
             bar_style: BarStyle::Braille,
+            motion: BarMotion::Bounce,
             block: None,
             style: Style::default(),
             alignment: Alignment::Left,
@@ -686,6 +750,27 @@ impl<'a> BarSpinner<'a> {
         self
     }
 
+    /// Sets the arc motion mode (default [`BarMotion::Bounce`]).
+    ///
+    /// - [`BarMotion::Bounce`] — reverses at each edge (ping-pong).
+    /// - [`BarMotion::Loop`] — wraps around; use with [`Spin`] to set the sweep direction.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::{BarSpinner, BarMotion, Spin};
+    ///
+    /// // Continuous left-to-right sweep
+    /// let sweep = BarSpinner::new(0)
+    ///     .spin(Spin::Clockwise)
+    ///     .motion(BarMotion::Loop);
+    /// ```
+    #[must_use]
+    pub fn motion(mut self, motion: BarMotion) -> Self {
+        self.motion = motion;
+        self
+    }
+
     /// Wraps the spinner in a [`Block`].
     ///
     /// # Examples
@@ -742,7 +827,7 @@ impl<'a> BarSpinner<'a> {
 
     fn build_lines(&self, actual_width: usize) -> Vec<Line<'static>> {
         let w = actual_width.max(3);
-        let mut engine = RectEngine::build(w, self.height, self.arc_width, self.spin);
+        let mut engine = RectEngine::build(w, self.height, self.arc_width, self.spin, self.motion);
 
         #[allow(clippy::cast_possible_truncation)]
         let steps = (self.tick / self.ticks_per_step) as usize;
@@ -828,7 +913,7 @@ mod tests {
         for w in 3..=30usize {
             for h in 1..=5usize {
                 for spin in [Spin::Clockwise, Spin::CounterClockwise] {
-                    let _ = RectEngine::build(w, h, 0, spin);
+                    let _ = RectEngine::build(w, h, 0, spin, BarMotion::Bounce);
                 }
             }
         }
@@ -836,7 +921,7 @@ mod tests {
 
     #[test]
     fn engine_walk_does_not_panic() {
-        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise);
+        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise, BarMotion::Bounce);
         for _ in 0..1000 {
             e.walk();
         }
@@ -844,7 +929,7 @@ mod tests {
 
     #[test]
     fn engine_anchor_stays_in_bounds() {
-        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise);
+        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise, BarMotion::Bounce);
         let max_anchor = e.char_w.saturating_sub(e.arc_cols);
         for _ in 0..500 {
             e.walk();
@@ -858,7 +943,7 @@ mod tests {
 
     #[test]
     fn engine_bounces_direction() {
-        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise);
+        let mut e = RectEngine::build(20, 1, 0, Spin::Clockwise, BarMotion::Bounce);
         assert!(e.going_forward, "should start going forward (CW)");
 
         // Walk until direction reverses to backward.
@@ -886,8 +971,8 @@ mod tests {
 
     #[test]
     fn cw_starts_at_left_ccw_at_right() {
-        let cw = RectEngine::build(20, 1, 0, Spin::Clockwise);
-        let ccw = RectEngine::build(20, 1, 0, Spin::CounterClockwise);
+        let cw = RectEngine::build(20, 1, 0, Spin::Clockwise, BarMotion::Bounce);
+        let ccw = RectEngine::build(20, 1, 0, Spin::CounterClockwise, BarMotion::Bounce);
         assert_eq!(cw.anchor, 0, "CW should start at column 0");
         assert!(
             ccw.anchor > 0,
@@ -903,7 +988,7 @@ mod tests {
     #[test]
     fn arc_edges_use_fade_bytes() {
         // Build a wide engine so there is a full-density centre.
-        let e = RectEngine::build(20, 1, 12, Spin::Clockwise);
+        let e = RectEngine::build(20, 1, 12, Spin::Clockwise, BarMotion::Bounce);
         let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF, None);
         assert_eq!(lines.len(), 1);
         let spans = &lines[0].spans;
@@ -928,7 +1013,7 @@ mod tests {
 
     #[test]
     fn dim_columns_use_dim_byte() {
-        let e = RectEngine::build(20, 1, 6, Spin::Clockwise);
+        let e = RectEngine::build(20, 1, 6, Spin::Clockwise, BarMotion::Bounce);
         let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF, None);
         let spans = &lines[0].spans;
         let dim_char = char::from_u32(0x2800 + u32::from(DIM_BYTE)).unwrap();
@@ -1001,7 +1086,7 @@ mod tests {
 
     #[test]
     fn arc_width_override_respected() {
-        let e = RectEngine::build(20, 1, 7, Spin::Clockwise);
+        let e = RectEngine::build(20, 1, 7, Spin::Clockwise, BarMotion::Bounce);
         assert_eq!(e.arc_cols, 7);
     }
 
@@ -1087,7 +1172,7 @@ mod tests {
 
     #[test]
     fn arc_char_changes_centre_byte() {
-        let e = RectEngine::build(20, 1, 10, Spin::Clockwise);
+        let e = RectEngine::build(20, 1, 10, Spin::Clockwise, BarMotion::Bounce);
         // Default arc_byte = 0xFF → centre cell is ⣿
         let lines_default = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF, None);
         // Custom arc_byte = 0x3F → centre cell is ⠿
@@ -1188,5 +1273,63 @@ mod tests {
     fn bar_style_builder() {
         let s = BarSpinner::new(0).bar_style(BarStyle::Dot);
         assert_eq!(s.bar_style, BarStyle::Dot);
+    }
+
+    // ── BarMotion ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn loop_motion_wraps_at_right_edge() {
+        let mut e = RectEngine::build(20, 1, 4, Spin::Clockwise, BarMotion::Loop);
+        let max = e.char_w - e.arc_cols;
+        // Walk until anchor reaches max_anchor.
+        for _ in 0..100 {
+            if e.anchor == max {
+                break;
+            }
+            e.walk();
+        }
+        assert_eq!(e.anchor, max, "anchor should reach max_anchor");
+        // One more step must wrap back to 0.
+        e.walk();
+        assert_eq!(e.anchor, 0, "Loop mode should wrap to 0");
+        // Direction flag must NOT have flipped.
+        assert!(e.going_forward, "Loop mode must not reverse direction");
+    }
+
+    #[test]
+    fn loop_motion_wraps_at_left_edge_ccw() {
+        let mut e = RectEngine::build(20, 1, 4, Spin::CounterClockwise, BarMotion::Loop);
+        let max = e.char_w - e.arc_cols;
+        // Walk until anchor reaches 0.
+        for _ in 0..100 {
+            if e.anchor == 0 {
+                break;
+            }
+            e.walk();
+        }
+        assert_eq!(e.anchor, 0);
+        e.walk();
+        assert_eq!(e.anchor, max, "CCW Loop should wrap to max_anchor");
+        assert!(!e.going_forward);
+    }
+
+    #[test]
+    fn bounce_still_reverses() {
+        let mut e = RectEngine::build(20, 1, 4, Spin::Clockwise, BarMotion::Bounce);
+        let max = e.char_w - e.arc_cols;
+        for _ in 0..100 {
+            if e.anchor == max {
+                break;
+            }
+            e.walk();
+        }
+        e.walk();
+        assert!(!e.going_forward, "Bounce must reverse at max_anchor");
+    }
+
+    #[test]
+    fn motion_builder() {
+        let s = BarSpinner::new(0).motion(BarMotion::Loop);
+        assert_eq!(s.motion, BarMotion::Loop);
     }
 }
