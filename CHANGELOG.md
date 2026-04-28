@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+### ✨ Features
+- feat: BarSpinner — BarTrack + fade_width; Hide compile in all VHS tapes
+- feat: BarSpinner arc_char + presets; 3-page example with ← → navigation
+### 🐛 Bug Fixes
+- fix: open CHANGELOG.md with --raw in release_prepare.nu
+## 0.1.1 - 2026-04-28
 ### ♻️ Refactor
 - Refactor Square spinner: simplify, remove Narrow, update styles
 - refactor: rename ZedSpinner -> DotSpinner; add Spin direction
@@ -31,3 +37,4 @@ All notable changes to this project will be documented in this file.
 - square, narrow, circle and linear spinner implementation
 ### 🔧 Chores
 - chore: remove stray disktest.txt
+- chore: bump version to 0.1.1
