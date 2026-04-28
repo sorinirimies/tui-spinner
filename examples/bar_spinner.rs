@@ -1,10 +1,14 @@
-//! # BarSpinner Example — 16 symbol styles, 3 pages
+//! # BarSpinner Example — direction + motion per style
 //!
-//! Page 1: Braille (2×2 sections)
-//! Page 2: Symbol Styles (4×4 grid, 16 variants)
-//! Page 3: Knobs
+//! Every style cell shows three bars: → Bounce, ← Bounce, ⟳ Loop.
 //!
-//! Controls: <- / h prev  -> / l next  q / Esc quit
+//! Page 1: Braille variants (2×2 grid)
+//! Page 2: Symbol Styles (4×4 grid, all 16 variants)
+//! Page 3: Knobs (arc width, track, fade, arc char)
+//!
+//! Controls: ← / h  prev  ·  → / l  next  ·  q / Esc  quit
+//!
+//! Run with: cargo run --example bar_spinner
 
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode};
@@ -123,12 +127,12 @@ fn render_header(frame: &mut Frame, area: Rect, page: usize) {
 
 fn render_footer(frame: &mut Frame, area: Rect, page: usize) {
     let prev = if page > 0 {
-        "<- / h  prev"
+        "← / h  prev"
     } else {
         "             "
     };
     let next = if page + 1 < NUM_PAGES {
-        "next  -> / l"
+        "next  → / l"
     } else {
         "             "
     };
@@ -153,44 +157,35 @@ fn render_footer(frame: &mut Frame, area: Rect, page: usize) {
     );
 }
 
-// ── Pair helper — 1 CW + 1 CCW bar ───────────────────────────────────────────
+// ── Trio helper — → Bounce, ← Bounce, ⟳ Loop ─────────────────────────────────
+//
+// Three bars in the cell's inner area, one per mode.  The hint character on
+// the right indicates the direction / motion for that row.
 
-fn pair<'a, F>(frame: &mut Frame, inner: Rect, tick: u64, h: usize, color: Color, make: F)
+fn trio<'a, F>(frame: &mut Frame, inner: Rect, tick: u64, color: Color, make: F)
 where
-    F: Fn(u64, Spin) -> BarSpinner<'a>,
+    F: Fn(u64, Spin, BarMotion) -> BarSpinner<'a>,
 {
-    let [cw, ccw, _] = Layout::vertical([
-        Constraint::Length(h as u16),
-        Constraint::Length(h as u16),
-        Constraint::Min(0),
-    ])
-    .areas(inner);
-    for (area, spin, hint) in [
-        (cw, Spin::Clockwise, "↻"),
-        (ccw, Spin::CounterClockwise, "↺"),
-    ] {
-        let [bar, hnt] =
-            Layout::horizontal([Constraint::Min(4), Constraint::Length(2)]).areas(area);
-        frame.render_widget(make(tick, spin), bar);
-        frame.render_widget(Paragraph::new(sp!(hint.to_string(); color)), hnt);
-    }
-}
-
-// ── Single-bar helper — one bar, one direction ──────────────────────────────
-
-fn single<'a>(frame: &mut Frame, inner: Rect, color: Color, hint: &str, spinner: BarSpinner<'a>) {
-    let [_, bar_row, _] = Layout::vertical([
-        Constraint::Min(0),
+    let [r1, r2, r3, _] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Min(0),
     ])
     .areas(inner);
-    let [bar, hnt] = Layout::horizontal([Constraint::Min(4), Constraint::Length(2)]).areas(bar_row);
-    frame.render_widget(spinner, bar);
-    frame.render_widget(Paragraph::new(sp!(hint.to_string(); color)), hnt);
+
+    for (row, spin, motion, hint) in [
+        (r1, Spin::Clockwise, BarMotion::Bounce, "→"),
+        (r2, Spin::CounterClockwise, BarMotion::Bounce, "←"),
+        (r3, Spin::Clockwise, BarMotion::Loop, "⟳"),
+    ] {
+        let [bar, hnt] = Layout::horizontal([Constraint::Min(4), Constraint::Length(2)]).areas(row);
+        frame.render_widget(make(tick, spin, motion), bar);
+        frame.render_widget(Paragraph::new(sp!(hint.to_string(); color)), hnt);
+    }
 }
 
-// ── Cell helper — compact bordered section ────────────────────────────────────
+// ── Cell helper ───────────────────────────────────────────────────────────────
 
 fn cell<F>(frame: &mut Frame, area: Rect, title: &str, color: Color, f: F)
 where
@@ -206,11 +201,7 @@ where
     f(frame, inner);
 }
 
-// ── Page 1: Braille ─────────────────────────────────────────────────────────
-//
-// Top row: Bounce ↻ vs Loop ↻ — SAME spin direction, different motion mode.
-// Side-by-side single bars make the ping-pong vs wrap-around obvious.
-// Bottom row: other Braille variants with CW+CCW pairs.
+// ── Page 1: Braille — 2×2 grid ───────────────────────────────────────────────
 
 fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
     let [top, bot] =
@@ -223,65 +214,26 @@ fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
     cell(
         frame,
         tl,
-        "Bounce ↻  ping-pong",
+        "Braille · h=1 · Rail · fade=3",
         Color::Cyan,
         |f, inner| {
-            single(
-                f,
-                inner,
-                Color::Cyan,
-                "↻",
-                BarSpinner::new(tick)
+            trio(f, inner, tick, Color::Cyan, |t, s, m| {
+                BarSpinner::new(t)
                     .height(1)
                     .arc_color(Color::Cyan)
                     .dim_color(Color::DarkGray)
-                    .motion(BarMotion::Bounce)
-                    .spin(Spin::Clockwise),
-            );
-        },
-    );
-    cell(
-        frame,
-        tr,
-        "Loop ↻  continuous sweep",
-        Color::LightGreen,
-        |f, inner| {
-            single(
-                f,
-                inner,
-                Color::LightGreen,
-                "↻",
-                BarSpinner::new(tick)
-                    .height(1)
-                    .arc_color(Color::LightGreen)
-                    .dim_color(Color::DarkGray)
-                    .motion(BarMotion::Loop)
-                    .spin(Spin::Clockwise),
-            );
-        },
-    );
-    cell(
-        frame,
-        bl,
-        "h=2 · two rows",
-        Color::LightBlue,
-        |f, inner| {
-            pair(f, inner, tick, 2, Color::LightBlue, |t, s| {
-                BarSpinner::new(t)
-                    .height(2)
-                    .arc_color(Color::LightBlue)
-                    .dim_color(Color::DarkGray)
                     .spin(s)
+                    .motion(m)
             });
         },
     );
     cell(
         frame,
-        br,
-        "Full track · fade=0  (sharp)",
+        tr,
+        "Braille · h=1 · Full track · fade=0",
         Color::White,
         |f, inner| {
-            pair(f, inner, tick, 1, Color::White, |t, s| {
+            trio(f, inner, tick, Color::White, |t, s, m| {
                 BarSpinner::new(t)
                     .height(1)
                     .arc_color(Color::White)
@@ -289,12 +241,46 @@ fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
                     .track(BarTrack::Full)
                     .fade_width(0)
                     .spin(s)
+                    .motion(m)
+            });
+        },
+    );
+    cell(
+        frame,
+        bl,
+        "Braille · h=2 · Rail",
+        Color::LightBlue,
+        |f, inner| {
+            trio(f, inner, tick, Color::LightBlue, |t, s, m| {
+                BarSpinner::new(t)
+                    .height(2)
+                    .arc_color(Color::LightBlue)
+                    .dim_color(Color::DarkGray)
+                    .spin(s)
+                    .motion(m)
+            });
+        },
+    );
+    cell(
+        frame,
+        br,
+        "Braille · h=1 · Empty track",
+        Color::LightMagenta,
+        |f, inner| {
+            trio(f, inner, tick, Color::LightMagenta, |t, s, m| {
+                BarSpinner::new(t)
+                    .height(1)
+                    .arc_color(Color::LightMagenta)
+                    .dim_color(Color::Black)
+                    .track(BarTrack::Empty)
+                    .spin(s)
+                    .motion(m)
             });
         },
     );
 }
 
-// ── Page 2: Symbol Styles 4x4 ────────────────────────────────────────────────
+// ── Page 2: Symbol Styles — 4×4 grid ─────────────────────────────────────────
 
 const STYLES: &[(BarStyle, &str, Color)] = &[
     (BarStyle::Block, "█░", Color::LightGreen),
@@ -328,18 +314,19 @@ fn page_symbols(frame: &mut Frame, area: Rect, tick: u64) {
         }
         let cols = Layout::horizontal(col_cs.clone()).split(rows[r]);
         cell(frame, cols[c], chars, color, move |f, inner| {
-            pair(f, inner, tick, 1, color, move |t, s| {
+            trio(f, inner, tick, color, move |t, s, m| {
                 BarSpinner::new(t)
                     .bar_style(style)
                     .arc_color(color)
                     .dim_color(Color::DarkGray)
                     .spin(s)
+                    .motion(m)
             });
         });
     }
 }
 
-// ── Page 3: Knobs ─────────────────────────────────────────────────────────────
+// ── Page 3: Knobs — 2×2 grid ─────────────────────────────────────────────────
 
 fn page_knobs(frame: &mut Frame, area: Rect, tick: u64) {
     let [top, bot] =
@@ -352,57 +339,60 @@ fn page_knobs(frame: &mut Frame, area: Rect, tick: u64) {
     cell(
         frame,
         tl,
-        "arc_width narrow vs wide",
+        "arc_width  narrow (5)  vs  wide (20)",
         Color::LightRed,
         |f, inner| {
             let [ha, hb] =
                 Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
                     .areas(inner);
-            lpair(f, ha, tick, "arc=5", 1, Color::LightRed, |t, s| {
+            knob_trio(f, ha, tick, "arc=5", Color::LightRed, |t, s, m| {
                 BarSpinner::new(t)
                     .arc_width(5)
                     .arc_color(Color::LightRed)
                     .dim_color(Color::DarkGray)
                     .spin(s)
+                    .motion(m)
             });
-            lpair(f, hb, tick, "arc=20", 1, Color::LightRed, |t, s| {
+            knob_trio(f, hb, tick, "arc=20", Color::LightRed, |t, s, m| {
                 BarSpinner::new(t)
                     .arc_width(20)
                     .arc_color(Color::LightRed)
                     .dim_color(Color::DarkGray)
                     .spin(s)
+                    .motion(m)
             });
         },
     );
     cell(
         frame,
         tr,
-        "track Rail vs Empty",
+        "track  Rail  vs  Empty",
         Color::LightYellow,
         |f, inner| {
             let [ha, hb] =
                 Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
                     .areas(inner);
-            lpair(f, ha, tick, "Rail", 1, Color::LightYellow, |t, s| {
+            knob_trio(f, ha, tick, "Rail", Color::LightYellow, |t, s, m| {
                 BarSpinner::new(t)
                     .track(BarTrack::Rail)
                     .arc_color(Color::LightYellow)
                     .dim_color(Color::DarkGray)
                     .spin(s)
+                    .motion(m)
             });
-            lpair(
+            knob_trio(
                 f,
                 hb,
                 tick,
                 "Empty (floats)",
-                1,
                 Color::LightYellow,
-                |t, s| {
+                |t, s, m| {
                     BarSpinner::new(t)
                         .track(BarTrack::Empty)
                         .arc_color(Color::LightYellow)
                         .dim_color(Color::Black)
                         .spin(s)
+                        .motion(m)
                 },
             );
         },
@@ -410,72 +400,91 @@ fn page_knobs(frame: &mut Frame, area: Rect, tick: u64) {
     cell(
         frame,
         bl,
-        "fade_width sharp vs soft",
+        "fade_width  sharp (0)  vs  soft (3)",
         Color::LightMagenta,
         |f, inner| {
             let [ha, hb] =
                 Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
                     .areas(inner);
-            lpair(f, ha, tick, "fade=0", 1, Color::LightMagenta, |t, s| {
-                BarSpinner::new(t)
-                    .fade_width(0)
-                    .arc_color(Color::LightMagenta)
-                    .dim_color(Color::DarkGray)
-                    .spin(s)
-            });
-            lpair(f, hb, tick, "fade=3", 1, Color::LightMagenta, |t, s| {
-                BarSpinner::new(t)
-                    .fade_width(3)
-                    .arc_color(Color::LightMagenta)
-                    .dim_color(Color::DarkGray)
-                    .spin(s)
-            });
+            knob_trio(
+                f,
+                ha,
+                tick,
+                "fade=0 sharp",
+                Color::LightMagenta,
+                |t, s, m| {
+                    BarSpinner::new(t)
+                        .fade_width(0)
+                        .arc_color(Color::LightMagenta)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                        .motion(m)
+                },
+            );
+            knob_trio(
+                f,
+                hb,
+                tick,
+                "fade=3 soft",
+                Color::LightMagenta,
+                |t, s, m| {
+                    BarSpinner::new(t)
+                        .fade_width(3)
+                        .arc_color(Color::LightMagenta)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                        .motion(m)
+                },
+            );
         },
     );
     cell(
         frame,
         br,
-        "arc_char full vs light",
+        "arc_char  full (0xFF)  vs  light (0x3F)",
         Color::LightCyan,
         |f, inner| {
             let [ha, hb] =
                 Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
                     .areas(inner);
-            lpair(f, ha, tick, "0xFF ⣿", 1, Color::LightCyan, |t, s| {
+            knob_trio(f, ha, tick, "0xFF ⣿ full", Color::LightCyan, |t, s, m| {
                 BarSpinner::new(t)
                     .arc_char(0xFF)
                     .arc_color(Color::LightCyan)
                     .dim_color(Color::DarkGray)
                     .spin(s)
+                    .motion(m)
             });
-            lpair(f, hb, tick, "0x3F ⠿", 1, Color::LightCyan, |t, s| {
-                BarSpinner::new(t)
-                    .arc_char(0x3F)
-                    .arc_color(Color::LightCyan)
-                    .dim_color(Color::DarkGray)
-                    .spin(s)
-            });
+            knob_trio(
+                f,
+                hb,
+                tick,
+                "0x3F ⠿ light",
+                Color::LightCyan,
+                |t, s, m| {
+                    BarSpinner::new(t)
+                        .arc_char(0x3F)
+                        .arc_color(Color::LightCyan)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                        .motion(m)
+                },
+            );
         },
     );
 }
 
-fn lpair<'a, F>(
-    frame: &mut Frame,
-    area: Rect,
-    tick: u64,
-    label: &str,
-    h: usize,
-    color: Color,
-    make: F,
-) where
-    F: Fn(u64, Spin) -> BarSpinner<'a>,
+// A labeled group of 3 bars (trio) with a dim label row above.
+fn knob_trio<'a, F>(frame: &mut Frame, area: Rect, tick: u64, label: &str, color: Color, make: F)
+where
+    F: Fn(u64, Spin, BarMotion) -> BarSpinner<'a>,
 {
     let [lbl, body, _] = Layout::vertical([
         Constraint::Length(1),
-        Constraint::Length(h as u16 * 2),
+        Constraint::Length(3),
         Constraint::Min(0),
     ])
     .areas(area);
     frame.render_widget(Paragraph::new(sp!(format!(" {label}"); dim)), lbl);
-    pair(frame, body, tick, h, color, make);
+    trio(frame, body, tick, color, make);
 }

@@ -23,7 +23,8 @@ use ratatui::{
 };
 use std::time::{Duration, Instant};
 use tui_spinner::{
-    Centre, CircleSpinner, Direction, LinearSpinner, LinearStyle, Spin, SquareSpinner,
+    BarMotion, BarSpinner, BarStyle, Centre, CircleSpinner, Direction, LinearSpinner, LinearStyle,
+    Spin, SquareSpinner,
 };
 
 // ── Style macros ──────────────────────────────────────────────────────────────
@@ -119,15 +120,17 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
 // ── Top-level layout ──────────────────────────────────────────────────────────
 
 fn render(frame: &mut Frame, app: &App) {
-    let [header, content, footer] = Layout::vertical([
+    let [header, content, bar_row, footer] = Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(0),
+        Constraint::Length(5),
         Constraint::Length(3),
     ])
     .areas(frame.area());
 
     render_header(frame, header);
     render_content(frame, content, app.tick);
+    render_bar_row(frame, bar_row, app.tick);
     render_footer(frame, footer);
 }
 
@@ -140,7 +143,7 @@ fn render_header(frame: &mut Frame, area: Rect) {
         .padding(Padding::horizontal(1));
 
     let text = Paragraph::new(
-        "Square · Filled · CW  ·  Square · Empty · CCW  ·  Circle  ·  LinearSpinner",
+        "Square · Filled · CW  ·  Square · Empty · CCW  ·  Circle  ·  LinearSpinner  ·  BarSpinner",
     )
     .alignment(Alignment::Center)
     .style(sty!(Color::Gray));
@@ -182,6 +185,69 @@ fn render_content(frame: &mut Frame, area: Rect, tick: u64) {
     render_square_empty_column(frame, col_empty, tick);
     render_circle_column(frame, col_circle, tick);
     render_linear_column(frame, col_linear, tick);
+}
+
+// ── BarSpinner row ─────────────────────────────────────────────────────────────
+
+fn render_bar_row(frame: &mut Frame, area: Rect, tick: u64) {
+    let outer = Block::bordered()
+        .title(" BarSpinner  ·  → Bounce  ←  ⟳ Loop ")
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
+        .border_style(sty!(Color::LightGreen))
+        .padding(Padding::horizontal(1));
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
+
+    // Four representative styles side by side.
+    // Each column shows one style with three bars: → Bounce, ← Bounce, ⟳ Loop.
+    let styles: &[(BarStyle, Color, &str)] = &[
+        (BarStyle::Braille, Color::Cyan, "Braille"),
+        (BarStyle::Block, Color::LightGreen, "Block"),
+        (BarStyle::Star, Color::Rgb(255, 220, 80), "Star"),
+        (BarStyle::Progress, Color::LightBlue, "Progress"),
+    ];
+
+    let col_cs: Vec<Constraint> = (0..styles.len())
+        .map(|_| Constraint::Ratio(1, styles.len() as u32))
+        .collect();
+    let cols = Layout::horizontal(col_cs).split(inner);
+
+    for (i, &(style, color, _label)) in styles.iter().enumerate() {
+        if i >= cols.len() {
+            break;
+        }
+        let col = cols[i];
+
+        let [r1, r2, r3] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .areas(col);
+
+        for (row, spin, motion, hint) in [
+            (r1, Spin::Clockwise, BarMotion::Bounce, "→"),
+            (r2, Spin::CounterClockwise, BarMotion::Bounce, "←"),
+            (r3, Spin::Clockwise, BarMotion::Loop, "⟳"),
+        ] {
+            let [bar, hnt] =
+                Layout::horizontal([Constraint::Min(4), Constraint::Length(2)]).areas(row);
+            frame.render_widget(
+                BarSpinner::new(tick)
+                    .bar_style(style)
+                    .arc_color(color)
+                    .dim_color(Color::DarkGray)
+                    .spin(spin)
+                    .motion(motion),
+                bar,
+            );
+            frame.render_widget(
+                Paragraph::new(Span::styled(hint, Style::default().fg(color))),
+                hnt,
+            );
+        }
+    }
 }
 
 // ── Col 1 — Square, Filled centre ─────────────────────────────────────────────
