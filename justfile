@@ -325,25 +325,25 @@ push-release-all: check-all
 # -- Release workflows -----------------------------------------------------
 
 # Bump, commit, tag, then push to GitHub — triggers Release workflow
-release version: bump
+release version: (bump version)
     @echo "Pushing release v{{ version }} to GitHub..."
     git push --follow-tags origin main
     @echo "✅ Release v{{ version }} pushed — Release workflow will trigger automatically."
 
 # Bump, commit, tag, then push to Gitea only
-release-gitea version: bump
+release-gitea version: (bump version)
     @echo "Pushing release v{{ version }} to Gitea..."
     git push --follow-tags gitea main
     @echo "✅ Release v{{ version }} live on Gitea."
 
 # Bump, commit, tag, then push to Gitea Starscream only
-release-gitea-starscream version: bump
+release-gitea-starscream version: (bump version)
     @echo "Pushing release v{{ version }} to Gitea Starscream..."
     git push --follow-tags gitea_starscream main
     @echo "✅ Release v{{ version }} live on Gitea Starscream."
 
 # Bump, commit, tag, then push to all remotes (continues on failure)
-release-all version: bump
+release-all version: (bump version)
     #!/usr/bin/env sh
     echo "Pushing release v{{ version }} to all remotes..."
     failed=""
