@@ -16,7 +16,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
-use tui_spinner::{BarSpinner, BarStyle, BarTrack, Spin};
+use tui_spinner::{BarMotion, BarSpinner, BarStyle, BarTrack, Spin};
 
 macro_rules! sty {
     (dim) => {
@@ -202,26 +202,34 @@ fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
     let [bl, br] =
         Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(bot);
 
-    cell(frame, tl, "h=1 · Rail · fade=3", Color::Cyan, |f, i| {
-        pair(f, i, tick, 1, Color::Cyan, |t, s| {
-            BarSpinner::new(t)
-                .height(1)
-                .arc_color(Color::Cyan)
-                .dim_color(Color::DarkGray)
-                .spin(s)
-        });
-    });
+    cell(
+        frame,
+        tl,
+        "Bounce  h=1 · Rail  (ping-pong)",
+        Color::Cyan,
+        |f, i| {
+            pair(f, i, tick, 1, Color::Cyan, |t, s| {
+                BarSpinner::new(t)
+                    .height(1)
+                    .arc_color(Color::Cyan)
+                    .dim_color(Color::DarkGray)
+                    .motion(BarMotion::Bounce)
+                    .spin(s)
+            });
+        },
+    );
     cell(
         frame,
         tr,
-        "h=2 · Rail · fade=3",
-        Color::LightBlue,
+        "Loop  h=1 · Rail  (continuous sweep)",
+        Color::LightGreen,
         |f, i| {
-            pair(f, i, tick, 2, Color::LightBlue, |t, s| {
+            pair(f, i, tick, 1, Color::LightGreen, |t, s| {
                 BarSpinner::new(t)
-                    .height(2)
-                    .arc_color(Color::LightBlue)
+                    .height(1)
+                    .arc_color(Color::LightGreen)
                     .dim_color(Color::DarkGray)
+                    .motion(BarMotion::Loop)
                     .spin(s)
             });
         },
@@ -229,7 +237,7 @@ fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
     cell(
         frame,
         bl,
-        "h=1 · Full track · fade=0",
+        "h=1 · Full track · fade=0  (sharp)",
         Color::White,
         |f, i| {
             pair(f, i, tick, 1, Color::White, |t, s| {
@@ -246,15 +254,14 @@ fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
     cell(
         frame,
         br,
-        "h=1 · Empty track",
-        Color::LightMagenta,
+        "h=2 · Rail · two rows",
+        Color::LightBlue,
         |f, i| {
-            pair(f, i, tick, 1, Color::LightMagenta, |t, s| {
+            pair(f, i, tick, 2, Color::LightBlue, |t, s| {
                 BarSpinner::new(t)
-                    .height(1)
-                    .arc_color(Color::LightMagenta)
-                    .dim_color(Color::Black)
-                    .track(BarTrack::Empty)
+                    .height(2)
+                    .arc_color(Color::LightBlue)
+                    .dim_color(Color::DarkGray)
                     .spin(s)
             });
         },
