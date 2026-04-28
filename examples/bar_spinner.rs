@@ -176,6 +176,20 @@ where
     }
 }
 
+// ── Single-bar helper — one bar, one direction ──────────────────────────────
+
+fn single<'a>(frame: &mut Frame, inner: Rect, color: Color, hint: &str, spinner: BarSpinner<'a>) {
+    let [_, bar_row, _] = Layout::vertical([
+        Constraint::Min(0),
+        Constraint::Length(1),
+        Constraint::Min(0),
+    ])
+    .areas(inner);
+    let [bar, hnt] = Layout::horizontal([Constraint::Min(4), Constraint::Length(2)]).areas(bar_row);
+    frame.render_widget(spinner, bar);
+    frame.render_widget(Paragraph::new(sp!(hint.to_string(); color)), hnt);
+}
+
 // ── Cell helper — compact bordered section ────────────────────────────────────
 
 fn cell<F>(frame: &mut Frame, area: Rect, title: &str, color: Color, f: F)
@@ -192,7 +206,11 @@ where
     f(frame, inner);
 }
 
-// ── Page 1: Braille ───────────────────────────────────────────────────────────
+// ── Page 1: Braille ─────────────────────────────────────────────────────────
+//
+// Top row: Bounce ↻ vs Loop ↻ — SAME spin direction, different motion mode.
+// Side-by-side single bars make the ping-pong vs wrap-around obvious.
+// Bottom row: other Braille variants with CW+CCW pairs.
 
 fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
     let [top, bot] =
@@ -205,48 +223,54 @@ fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
     cell(
         frame,
         tl,
-        "Bounce  h=1 · Rail  (ping-pong)",
+        "Bounce ↻  ping-pong",
         Color::Cyan,
-        |f, i| {
-            pair(f, i, tick, 1, Color::Cyan, |t, s| {
-                BarSpinner::new(t)
+        |f, inner| {
+            single(
+                f,
+                inner,
+                Color::Cyan,
+                "↻",
+                BarSpinner::new(tick)
                     .height(1)
                     .arc_color(Color::Cyan)
                     .dim_color(Color::DarkGray)
                     .motion(BarMotion::Bounce)
-                    .spin(s)
-            });
+                    .spin(Spin::Clockwise),
+            );
         },
     );
     cell(
         frame,
         tr,
-        "Loop  h=1 · Rail  (continuous sweep)",
+        "Loop ↻  continuous sweep",
         Color::LightGreen,
-        |f, i| {
-            pair(f, i, tick, 1, Color::LightGreen, |t, s| {
-                BarSpinner::new(t)
+        |f, inner| {
+            single(
+                f,
+                inner,
+                Color::LightGreen,
+                "↻",
+                BarSpinner::new(tick)
                     .height(1)
                     .arc_color(Color::LightGreen)
                     .dim_color(Color::DarkGray)
                     .motion(BarMotion::Loop)
-                    .spin(s)
-            });
+                    .spin(Spin::Clockwise),
+            );
         },
     );
     cell(
         frame,
         bl,
-        "h=1 · Full track · fade=0  (sharp)",
-        Color::White,
-        |f, i| {
-            pair(f, i, tick, 1, Color::White, |t, s| {
+        "h=2 · two rows",
+        Color::LightBlue,
+        |f, inner| {
+            pair(f, inner, tick, 2, Color::LightBlue, |t, s| {
                 BarSpinner::new(t)
-                    .height(1)
-                    .arc_color(Color::White)
+                    .height(2)
+                    .arc_color(Color::LightBlue)
                     .dim_color(Color::DarkGray)
-                    .track(BarTrack::Full)
-                    .fade_width(0)
                     .spin(s)
             });
         },
@@ -254,14 +278,16 @@ fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
     cell(
         frame,
         br,
-        "h=2 · Rail · two rows",
-        Color::LightBlue,
-        |f, i| {
-            pair(f, i, tick, 2, Color::LightBlue, |t, s| {
+        "Full track · fade=0  (sharp)",
+        Color::White,
+        |f, inner| {
+            pair(f, inner, tick, 1, Color::White, |t, s| {
                 BarSpinner::new(t)
-                    .height(2)
-                    .arc_color(Color::LightBlue)
+                    .height(1)
+                    .arc_color(Color::White)
                     .dim_color(Color::DarkGray)
+                    .track(BarTrack::Full)
+                    .fade_width(0)
                     .spin(s)
             });
         },
