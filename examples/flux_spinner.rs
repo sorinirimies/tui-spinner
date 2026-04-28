@@ -1,12 +1,10 @@
 //! # FluxSpinner Example
 //!
-//! One row per [`FluxFrames`] preset.  Each row shows the same preset
-//! animating **forward** (Clockwise ↻) on the left and **backward**
-//! (Counter-Clockwise ↺) on the right so the direction reversal is
-//! immediately obvious.
+//! Displays all [`FluxFrames`] presets in a **4 × 3 grid**.
+//! Every tile shows the preset name, the CW ↻ and CCW ↺ animated glyphs
+//! side by side, the full frame sequence, and the frame count.
 //!
-//! **Controls:**
-//! - `q` / `Esc` — Quit
+//! **Controls:** `q` / `Esc` — Quit
 //!
 //! Run with: `cargo run --example flux_spinner`
 
@@ -16,11 +14,11 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Padding, Paragraph},
+    widgets::{Block, BorderType, Paragraph},
     DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
-use tui_spinner::{FluxFrames, FluxSpinner, Spin};
+use tui_spinner::{FluxFrames, Spin};
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -55,13 +53,12 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
         let steps = (delta.as_millis() / 80).max(1) as u64;
         app.tick = app.tick.wrapping_add(steps);
 
-        terminal.draw(|frame| render(frame, app))?;
+        terminal.draw(|f| render(f, app))?;
 
         if event::poll(Duration::from_millis(16))? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,
-                    _ => {}
+            if let Event::Key(k) = event::read()? {
+                if matches!(k.code, KeyCode::Char('q') | KeyCode::Esc) {
+                    break;
                 }
             }
         }
@@ -69,81 +66,29 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
     Ok(())
 }
 
-// ── Root layout ───────────────────────────────────────────────────────────────
+// ── Frame helper ──────────────────────────────────────────────────────────────
 
-fn render(frame: &mut Frame, app: &App) {
-    let [header, body, footer] = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Min(0),
-        Constraint::Length(3),
-    ])
-    .areas(frame.area());
+/// Ticks held per animation step — increase to slow the animation down.
+const TPS: u64 = 4;
 
-    render_header(frame, header);
-    render_body(frame, body, app.tick);
-    render_footer(frame, footer);
+/// Return the current animated glyph for `frames` at `tick` in `spin` direction.
+fn frame_char(frames: &[char], tick: u64, spin: Spin) -> char {
+    let n = frames.len();
+    if n == 0 {
+        return ' ';
+    }
+    let base = (tick / TPS) as usize;
+    let idx = match spin {
+        Spin::CounterClockwise => (n - base % n) % n,
+        _ => base % n,
+    };
+    frames[idx]
 }
 
-fn render_header(frame: &mut Frame, area: Rect) {
-    frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled("↻  Clockwise", Style::default().fg(Color::Cyan)),
-            Span::styled(
-                "  ·  frame preset  ·  ",
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::styled("Counter-Clockwise  ↺", Style::default().fg(Color::Blue)),
-        ]))
-        .alignment(Alignment::Center)
-        .block(
-            Block::bordered()
-                .title(" FluxSpinner ")
-                .title_alignment(Alignment::Center)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::DarkGray)),
-        ),
-        area,
-    );
-}
+// ── Preset table ──────────────────────────────────────────────────────────────
 
-fn render_footer(frame: &mut Frame, area: Rect) {
-    let line = Line::from(vec![
-        Span::styled(
-            "q",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" / "),
-        Span::styled(
-            "Esc",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw("  Quit"),
-    ]);
-    frame.render_widget(
-        Paragraph::new(line).alignment(Alignment::Center).block(
-            Block::bordered()
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::DarkGray)),
-        ),
-        area,
-    );
-}
-
-// ── Body ──────────────────────────────────────────────────────────────────────
-//
-// One row per preset.  Layout of each row:
-//
-//   [CW spinner]  [name · n frames · glyph sequence]  [CCW spinner]
-//
-// The spinner column is narrow (1 char); the label fills the middle;
-// the CCW spinner mirrors the right edge.
-
-/// (frames, name, frame-count label, glyph-sequence preview, accent color)
-const ROWS: &[(&[char], &str, &str, Color)] = &[
+/// (frames, name, glyph-sequence preview, accent color)
+const PRESETS: &[(&[char], &str, &str, Color)] = &[
     (
         FluxFrames::BRAILLE,
         "BRAILLE",
@@ -180,7 +125,7 @@ const ROWS: &[(&[char], &str, &str, Color)] = &[
     (
         FluxFrames::MOON,
         "MOON",
-        "◐ ◓ ◑ ◒",
+        "◓ ◑ ◒ ◐",
         Color::Rgb(180, 220, 255),
     ),
     (
@@ -197,90 +142,201 @@ const ROWS: &[(&[char], &str, &str, Color)] = &[
     ),
 ];
 
-fn render_body(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = Block::bordered()
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .padding(Padding::horizontal(2));
+// ── Root layout ───────────────────────────────────────────────────────────────
 
-    let inner = outer.inner(area);
-    frame.render_widget(outer, area);
+fn render(frame: &mut Frame, app: &App) {
+    let [header, body, footer] = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Min(0),
+        Constraint::Length(3),
+    ])
+    .areas(frame.area());
 
-    let n = ROWS.len();
-    let row_h = (inner.height / n as u16).max(1);
-    let constraints: Vec<Constraint> = (0..n)
-        .map(|_| Constraint::Length(row_h))
-        .chain([Constraint::Min(0)])
-        .collect();
-    let rows = Layout::vertical(constraints).split(inner);
+    render_header(frame, header);
+    render_grid(frame, body, app.tick);
+    render_footer(frame, footer);
+}
 
-    for (i, &(frames, name, glyphs, color)) in ROWS.iter().enumerate() {
-        if i >= rows.len().saturating_sub(1) {
-            break;
+fn render_header(frame: &mut Frame, area: Rect) {
+    let dim = Style::default().fg(Color::DarkGray);
+    let line = Line::from(vec![
+        Span::styled("↻", Style::default().fg(Color::Cyan)),
+        Span::styled("  Clockwise", Style::default().fg(Color::Cyan)),
+        Span::styled("  ·  frame preset ·  ", dim),
+        Span::styled("Counter-Clockwise  ", Style::default().fg(Color::Blue)),
+        Span::styled("↺", Style::default().fg(Color::Blue)),
+    ]);
+    frame.render_widget(
+        Paragraph::new(line).alignment(Alignment::Center).block(
+            Block::bordered()
+                .title(" FluxSpinner ")
+                .title_alignment(Alignment::Center)
+                .border_type(BorderType::Rounded)
+                .border_style(dim),
+        ),
+        area,
+    );
+}
+
+fn render_footer(frame: &mut Frame, area: Rect) {
+    let line = Line::from(vec![
+        Span::styled(
+            "q",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" / "),
+        Span::styled(
+            "Esc",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw("  Quit"),
+    ]);
+    frame.render_widget(
+        Paragraph::new(line).alignment(Alignment::Center).block(
+            Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::DarkGray)),
+        ),
+        area,
+    );
+}
+
+// ── 4 × 3 grid ────────────────────────────────────────────────────────────────
+
+fn render_grid(frame: &mut Frame, area: Rect, tick: u64) {
+    let rows = Layout::vertical([
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+    ])
+    .split(area);
+
+    for (row_idx, &row_area) in rows.iter().enumerate() {
+        let cols = Layout::horizontal([
+            Constraint::Ratio(1, 4),
+            Constraint::Ratio(1, 4),
+            Constraint::Ratio(1, 4),
+            Constraint::Ratio(1, 4),
+        ])
+        .split(row_area);
+
+        for (col_idx, &col_area) in cols.iter().enumerate() {
+            let preset_idx = row_idx * 4 + col_idx;
+            if preset_idx < PRESETS.len() {
+                let (frames, name, glyphs, color) = PRESETS[preset_idx];
+                render_tile(frame, col_area, tick, frames, name, glyphs, color);
+            } else if preset_idx == 11 {
+                render_custom_tile(frame, col_area);
+            }
         }
-        render_preset_row(frame, rows[i], tick, frames, name, glyphs, color);
     }
 }
 
-fn render_preset_row(
+// ── Tile ──────────────────────────────────────────────────────────────────────
+
+fn render_tile(
     frame: &mut Frame,
     area: Rect,
     tick: u64,
-    frames: &'static [char],
+    frames: &[char],
     name: &str,
     glyphs: &str,
     color: Color,
 ) {
-    // [CW 1ch] [gap 2ch] [label fills] [gap 2ch] [CCW 1ch]
-    let [cw_area, gap_l, label_area, gap_r, ccw_area] = Layout::horizontal([
-        Constraint::Length(1),
-        Constraint::Length(2),
+    let block = Block::bordered()
+        .title(format!(" {name} "))
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(color));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // Divide inner into three equal horizontal bands.
+    let [spinners_area, glyphs_area, count_area] = Layout::vertical([
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+    ])
+    .areas(inner);
+
+    let cw = frame_char(frames, tick, Spin::Clockwise);
+    let ccw = frame_char(frames, tick, Spin::CounterClockwise);
+    let dim = Style::default().fg(Color::DarkGray);
+    let accent = Style::default().fg(color);
+    let bold_accent = accent.add_modifier(Modifier::BOLD);
+
+    // Band 1 — animated CW and CCW glyphs.
+    let spinner_line = Line::from(vec![
+        Span::styled("↻ ", dim),
+        Span::styled(cw.to_string(), bold_accent),
+        Span::styled("   ", dim),
+        Span::styled(ccw.to_string(), bold_accent),
+        Span::styled(" ↺", dim),
+    ]);
+    render_vcenter(frame, spinners_area, spinner_line);
+
+    // Band 2 — full frame sequence.
+    render_vcenter(frame, glyphs_area, Line::from(Span::styled(glyphs, accent)));
+
+    // Band 3 — frame count.
+    render_vcenter(
+        frame,
+        count_area,
+        Line::from(Span::styled(format!("· {} frames ·", frames.len()), dim)),
+    );
+}
+
+fn render_custom_tile(frame: &mut Frame, area: Rect) {
+    let dim = Style::default().fg(Color::DarkGray);
+
+    let block = Block::bordered()
+        .title(" CUSTOM ")
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
+        .border_style(dim);
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let [top, mid, bot] = Layout::vertical([
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 3),
+    ])
+    .areas(inner);
+
+    render_vcenter(
+        frame,
+        top,
+        Line::from(Span::styled("any &'static [char]", dim)),
+    );
+    render_vcenter(
+        frame,
+        mid,
+        Line::from(Span::styled(
+            ".frames(&['a','b','c'])",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        )),
+    );
+    render_vcenter(frame, bot, Line::from(Span::styled("· any length ·", dim)));
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Render `line` centred horizontally and vertically within `area`.
+fn render_vcenter(frame: &mut Frame, area: Rect, line: Line) {
+    let [_, center, _] = Layout::vertical([
         Constraint::Min(0),
-        Constraint::Length(2),
         Constraint::Length(1),
+        Constraint::Min(0),
     ])
     .areas(area);
-
-    // Silence unused-variable warnings on gap areas
-    let _ = (gap_l, gap_r);
-
-    // CW spinner
-    frame.render_widget(
-        FluxSpinner::new(tick)
-            .frames(frames)
-            .color(color)
-            .ticks_per_step(4),
-        cw_area,
-    );
-
-    // CCW spinner
-    frame.render_widget(
-        FluxSpinner::new(tick)
-            .frames(frames)
-            .spin(Spin::CounterClockwise)
-            .color(color)
-            .ticks_per_step(4),
-        ccw_area,
-    );
-
-    // Label: "NAME · n frames · glyph sequence"
-    let n_frames = frames.len();
-    let label = Line::from(vec![
-        Span::styled(
-            format!("{name:<10}"),
-            Style::default().fg(color).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            format!("{n_frames} frames"),
-            Style::default().fg(Color::DarkGray),
-        ),
-        Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
-        Span::styled(glyphs, Style::default().fg(color)),
-    ]);
-
-    frame.render_widget(
-        Paragraph::new(label).alignment(Alignment::Center),
-        label_area,
-    );
+    frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), center);
 }
