@@ -1,14 +1,15 @@
 //! # BarSpinner Example
 //!
-//! Three-page interactive demo of [`BarSpinner`].
+//! Three-page interactive demo — every concept shows **exactly one Clockwise ↻
+//! bar and one Counter-Clockwise ↺ bar** so the difference is always obvious.
 //!
-//! | Page | Content |
-//! |------|---------|
-//! | 1 | Heights & directions — 1/2/3-row bars, CW ↻ vs CCW ↺ |
-//! | 2 | Style knobs — arc width, track, fade, arc_char |
-//! | 3 | Presets — [`BarSpinner::zed`], [`BarSpinner::claude`], etc. |
+//! | Page | Focus |
+//! |------|-------|
+//! | 1 | Heights & styles — different visual patterns |
+//! | 2 | Style knobs — arc_width, track, fade_width, arc_char |
+//! | 3 | Presets — [`BarSpinner::zed`] etc. |
 //!
-//! **Controls:** `←` / `→` change page  ·  `q` / `Esc` quit
+//! **Controls:** `←` / `h` prev  ·  `→` / `l` next  ·  `q` / `Esc` quit
 //!
 //! Run with: `cargo run --example bar_spinner`
 
@@ -18,7 +19,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Padding, Paragraph},
+    widgets::{Block, BorderType, Paragraph},
     DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
@@ -50,22 +51,10 @@ macro_rules! sp {
     };
 }
 
-macro_rules! section_block {
-    ($title:expr, $color:expr) => {
-        Block::bordered()
-            .title(concat!(" ", $title, " "))
-            .title_alignment(Alignment::Center)
-            .border_type(BorderType::Rounded)
-            .border_style(sty!($color))
-            .padding(Padding::horizontal(1))
-    };
-}
-
-// ── Page constants ────────────────────────────────────────────────────────────
+// ── Pages ─────────────────────────────────────────────────────────────────────
 
 const NUM_PAGES: usize = 3;
-
-const PAGE_TITLES: [&str; NUM_PAGES] = ["Heights & Directions", "Style Knobs", "Presets"];
+const PAGE_TITLES: [&str; 3] = ["Heights & Styles", "Style Knobs", "Presets"];
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -85,8 +74,6 @@ impl Default for App {
     }
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────────
-
 fn main() -> Result<()> {
     color_eyre::install()?;
     let terminal = ratatui::init();
@@ -100,9 +87,7 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
         let steps = (Instant::now().duration_since(app.last_tick).as_millis() / 80).max(1) as u64;
         app.last_tick = Instant::now();
         app.tick = app.tick.wrapping_add(steps);
-
         terminal.draw(|f| render(f, app))?;
-
         if event::poll(Duration::from_millis(16))? {
             if let Event::Key(k) = event::read()? {
                 match k.code {
@@ -121,7 +106,7 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
     Ok(())
 }
 
-// ── Root layout ───────────────────────────────────────────────────────────────
+// ── Shell ─────────────────────────────────────────────────────────────────────
 
 fn render(frame: &mut Frame, app: &App) {
     let [header, body, footer] = Layout::vertical([
@@ -130,24 +115,29 @@ fn render(frame: &mut Frame, app: &App) {
         Constraint::Length(3),
     ])
     .areas(frame.area());
-
     render_header(frame, header, app.page);
-    render_page(frame, body, app.tick, app.page);
+    match app.page {
+        0 => page_heights(frame, body, app.tick),
+        1 => page_knobs(frame, body, app.tick),
+        2 => page_presets(frame, body, app.tick),
+        _ => {}
+    }
     render_footer(frame, footer, app.page);
 }
 
 fn render_header(frame: &mut Frame, area: Rect, page: usize) {
-    let title = PAGE_TITLES[page];
     frame.render_widget(
-        Paragraph::new(sp!(format!("Page {} of {}  ·  {}", page + 1, NUM_PAGES, title); dim))
-            .alignment(Alignment::Center)
-            .block(
-                Block::bordered()
-                    .title(" BarSpinner ")
-                    .title_alignment(Alignment::Center)
-                    .border_type(BorderType::Rounded)
-                    .border_style(sty!(dim)),
-            ),
+        Paragraph::new(Line::from(vec![
+            sp!(format!("{}/{}  ·  {}", page + 1, NUM_PAGES, PAGE_TITLES[page]); dim),
+        ]))
+        .alignment(Alignment::Center)
+        .block(
+            Block::bordered()
+                .title(" BarSpinner ")
+                .title_alignment(Alignment::Center)
+                .border_type(BorderType::Rounded)
+                .border_style(sty!(dim)),
+        ),
         area,
     );
 }
@@ -156,25 +146,26 @@ fn render_footer(frame: &mut Frame, area: Rect, page: usize) {
     let prev = if page > 0 {
         "← / h  prev"
     } else {
-        "           "
+        "            "
     };
     let next = if page + 1 < NUM_PAGES {
         "next  → / l"
     } else {
-        "           "
+        "            "
     };
-    let line = Line::from(vec![
-        sp!(prev; Color::Cyan),
-        sp!("     "; dim),
-        sp!("q"; Color::Cyan, b),
-        sp!(" / "; dim),
-        sp!("Esc"; Color::Cyan, b),
-        sp!("  Quit"; dim),
-        sp!("     "; dim),
-        sp!(next; Color::Cyan),
-    ]);
     frame.render_widget(
-        Paragraph::new(line).alignment(Alignment::Center).block(
+        Paragraph::new(Line::from(vec![
+            sp!(prev; Color::Cyan),
+            sp!("     "; dim),
+            sp!("q"; Color::Cyan, b),
+            sp!(" / "; dim),
+            sp!("Esc"; Color::Cyan, b),
+            sp!("  quit"; dim),
+            sp!("     "; dim),
+            sp!(next; Color::Cyan),
+        ]))
+        .alignment(Alignment::Center)
+        .block(
             Block::bordered()
                 .border_type(BorderType::Rounded)
                 .border_style(sty!(dim)),
@@ -183,440 +174,423 @@ fn render_footer(frame: &mut Frame, area: Rect, page: usize) {
     );
 }
 
-fn render_page(frame: &mut Frame, area: Rect, tick: u64, page: usize) {
-    match page {
-        0 => render_page_heights(frame, area, tick),
-        1 => render_page_knobs(frame, area, tick),
-        2 => render_page_presets(frame, area, tick),
-        _ => {}
-    }
+// ── Pair helper ───────────────────────────────────────────────────────────────
+//
+// Renders a labelled concept as exactly TWO bars: one CW ↻, one CCW ↺.
+// `make` receives the direction and returns the configured spinner.
+
+fn render_pair<'a, F>(
+    frame: &mut Frame,
+    area: Rect,
+    tick: u64,
+    label: &str,
+    height: usize,
+    color: Color,
+    make: F,
+) where
+    F: Fn(u64, Spin) -> BarSpinner<'a>,
+{
+    // Vertical split: 1-row label  +  height CW  +  height CCW  +  leftover.
+    let constraints = vec![
+        Constraint::Length(1),
+        Constraint::Length(height as u16),
+        Constraint::Length(height as u16),
+        Constraint::Min(0),
+    ];
+    let rows = Layout::vertical(constraints).split(area);
+
+    // Label row
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![sp!(format!(" {label}"); color, b)])),
+        rows[0],
+    );
+
+    // CW bar + direction hint
+    render_bar_with_hint(
+        frame,
+        rows[1],
+        tick,
+        color,
+        make(tick, Spin::Clockwise),
+        "↻",
+    );
+    // CCW bar + direction hint
+    render_bar_with_hint(
+        frame,
+        rows[2],
+        tick,
+        color,
+        make(tick, Spin::CounterClockwise),
+        "↺",
+    );
 }
 
-// ── Page 1: Heights & Directions ─────────────────────────────────────────────
+fn render_bar_with_hint<'a>(
+    frame: &mut Frame,
+    row: Rect,
+    _tick: u64,
+    color: Color,
+    spinner: BarSpinner<'a>,
+    hint: &str,
+) {
+    // Reserve 2 chars on the right for the ↻/↺ hint.
+    let hint_w = 2u16;
+    let bar_w = row.width.saturating_sub(hint_w);
+    let [bar_area, hint_area] =
+        Layout::horizontal([Constraint::Length(bar_w), Constraint::Length(hint_w)]).areas(row);
 
-fn render_page_heights(frame: &mut Frame, area: Rect, tick: u64) {
-    let [left, right] =
-        Layout::horizontal([Constraint::Percentage(55), Constraint::Percentage(45)]).areas(area);
-    render_heights_section(frame, left, tick);
-    render_directions_section(frame, right, tick);
+    frame.render_widget(spinner, bar_area);
+    frame.render_widget(Paragraph::new(sp!(hint.to_string(); color)), hint_area);
 }
 
-// ── height configs: (height_rows, arc_color, dim_color, spin, tps, label)
-const HEIGHT_ROWS: &[(usize, Color, Color, Spin, u64, &str)] = &[
-    // 1-row Zed-style
-    (
-        1,
-        Color::Cyan,
-        Color::DarkGray,
-        Spin::Clockwise,
-        1,
-        "h=1  ↻  cyan",
-    ),
-    (
-        1,
-        Color::LightBlue,
-        Color::DarkGray,
-        Spin::CounterClockwise,
-        1,
-        "h=1  ↺  blue",
-    ),
-    (
-        1,
-        Color::White,
-        Color::DarkGray,
-        Spin::Clockwise,
-        2,
-        "h=1  ↻  slow",
-    ),
-    (
-        1,
-        Color::Cyan,
-        Color::Black,
-        Spin::Clockwise,
-        1,
-        "h=1  ↻  no track",
-    ),
-    // 2-row Claude-style
-    (
-        2,
-        Color::Yellow,
-        Color::DarkGray,
-        Spin::Clockwise,
-        1,
-        "h=2  ↻  yellow",
-    ),
-    (
-        2,
-        Color::Rgb(255, 165, 0),
-        Color::DarkGray,
-        Spin::CounterClockwise,
-        2,
-        "h=2  ↺  orange",
-    ),
-    (
-        2,
-        Color::Rgb(255, 200, 50),
-        Color::Rgb(60, 30, 0),
-        Spin::Clockwise,
-        1,
-        "h=2  ↻  warm bg",
-    ),
-    // 3-row thick
-    (
-        3,
-        Color::LightGreen,
-        Color::DarkGray,
-        Spin::Clockwise,
-        1,
-        "h=3  ↻  green",
-    ),
-    (
-        3,
-        Color::Magenta,
-        Color::DarkGray,
-        Spin::CounterClockwise,
-        2,
-        "h=3  ↺  slow",
-    ),
-];
+// ── Page 1 — Heights & Styles ─────────────────────────────────────────────────
+//
+// Four visually distinct pattern concepts, each shown as 1 CW + 1 CCW bar.
 
-fn render_heights_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = section_block!("Heights  1 · 2 · 3 rows", Color::Cyan);
-    let inner = outer.inner(area);
-    frame.render_widget(outer, area);
+fn page_heights(frame: &mut Frame, area: Rect, tick: u64) {
+    // Each concept: (label, height, label_color, CW+CCW builder)
+    // We allocate 1 label row + 2*height content rows per concept.
+    let concepts: &[(
+        &str,
+        usize,
+        Color,
+        Box<dyn Fn(u64, Spin) -> BarSpinner<'static>>,
+    )] = &[
+        // 1 — Thin Zed-style, cyan, Rail track
+        (
+            "Zed-style  ·  h=1  ·  cyan  ·  Rail track",
+            1,
+            Color::Cyan,
+            Box::new(|t, s| {
+                BarSpinner::new(t)
+                    .height(1)
+                    .arc_color(Color::Cyan)
+                    .dim_color(Color::DarkGray)
+                    .spin(s)
+            }),
+        ),
+        // 2 — Claude 2-row, warm orange, Rail track
+        (
+            "Claude-style  ·  h=2  ·  orange  ·  Rail track",
+            2,
+            Color::Rgb(255, 165, 0),
+            Box::new(|t, s| {
+                BarSpinner::new(t)
+                    .height(2)
+                    .arc_color(Color::Rgb(255, 165, 0))
+                    .dim_color(Color::DarkGray)
+                    .spin(s)
+            }),
+        ),
+        // 3 — Sharp edges, no fade, white arc, Full track
+        (
+            "Sharp  ·  h=1  ·  white  ·  Full track  ·  fade=0",
+            1,
+            Color::White,
+            Box::new(|t, s| {
+                BarSpinner::new(t)
+                    .height(1)
+                    .arc_color(Color::White)
+                    .dim_color(Color::DarkGray)
+                    .track(BarTrack::Full)
+                    .fade_width(0)
+                    .spin(s)
+            }),
+        ),
+        // 4 — Floating arc, Empty track (arc on empty space)
+        (
+            "Float  ·  h=1  ·  magenta  ·  Empty track",
+            1,
+            Color::LightMagenta,
+            Box::new(|t, s| {
+                BarSpinner::new(t)
+                    .height(1)
+                    .arc_color(Color::LightMagenta)
+                    .dim_color(Color::Black)
+                    .track(BarTrack::Empty)
+                    .spin(s)
+            }),
+        ),
+    ];
 
-    // One row per config; height of each row = the spinner's row count.
-    let constraints: Vec<Constraint> = HEIGHT_ROWS
+    // Build height-aware constraints: 1 label + 2*h content + 1 gap, per concept.
+    let per_concept: Vec<u16> = concepts
         .iter()
-        .map(|&(h, ..)| Constraint::Length(h as u16))
+        .map(|(_, h, ..)| 1 + 2 * *h as u16 + 1)
+        .collect();
+    let constraints: Vec<Constraint> = per_concept
+        .iter()
+        .map(|&h| Constraint::Length(h))
         .chain([Constraint::Min(0)])
         .collect();
-    let rows = Layout::vertical(constraints).split(inner);
+    let slots = Layout::vertical(constraints).split(area);
 
-    for (i, &(h, arc, dim, spin, tps, label)) in HEIGHT_ROWS.iter().enumerate() {
-        if i >= rows.len().saturating_sub(1) {
-            break;
-        }
-        let label_w = (label.len() as u16 + 2).min(rows[i].width.saturating_sub(4));
-        let spinner_w = rows[i].width.saturating_sub(label_w);
-        let [spin_area, lbl_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Length(label_w)])
-                .areas(rows[i]);
-
-        frame.render_widget(
-            BarSpinner::new(tick)
-                .height(h)
-                .arc_color(arc)
-                .dim_color(dim)
-                .spin(spin)
-                .ticks_per_step(tps),
-            spin_area,
-        );
-        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); arc)), lbl_area);
-    }
-}
-
-// ── CW vs CCW: (color, tps)
-const DIR_PAIRS: &[(Color, u64)] = &[
-    (Color::Cyan, 1),
-    (Color::Yellow, 1),
-    (Color::Magenta, 2),
-    (Color::LightGreen, 1),
-];
-
-fn render_directions_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = section_block!("CW ↻  vs  CCW ↺  ·  same tick", Color::LightCyan);
-    let inner = outer.inner(area);
-    frame.render_widget(outer, area);
-
-    let n = DIR_PAIRS.len();
-    let pair_h = (inner.height / n as u16).max(2);
-    let constraints: Vec<Constraint> = (0..n)
-        .map(|_| Constraint::Length(pair_h))
-        .chain([Constraint::Min(0)])
-        .collect();
-    let slots = Layout::vertical(constraints).split(inner);
-
-    for (i, &(color, tps)) in DIR_PAIRS.iter().enumerate() {
+    for (i, (label, height, color, make)) in concepts.iter().enumerate() {
         if i >= slots.len().saturating_sub(1) {
             break;
         }
-        let slot = slots[i];
-        let [cw_row, ccw_row] =
-            Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(slot);
-
-        for (row, spin) in [(cw_row, Spin::Clockwise), (ccw_row, Spin::CounterClockwise)] {
-            let arrow = if matches!(spin, Spin::Clockwise) {
-                "↻"
-            } else {
-                "↺"
-            };
-            let label_w = 4u16;
-            let spinner_w = row.width.saturating_sub(label_w);
-            let [spin_area, lbl_area] =
-                Layout::horizontal([Constraint::Length(spinner_w), Constraint::Length(label_w)])
-                    .areas(row);
-
-            frame.render_widget(
-                BarSpinner::new(tick)
-                    .height(1)
-                    .arc_color(color)
-                    .dim_color(Color::DarkGray)
-                    .spin(spin)
-                    .ticks_per_step(tps),
-                spin_area,
-            );
-            frame.render_widget(Paragraph::new(sp!(format!(" {arrow}  "); color)), lbl_area);
-        }
+        render_pair(frame, slots[i], tick, label, *height, *color, |t, s| {
+            make(t, s)
+        });
     }
 }
 
-// ── Page 2: Style Knobs ───────────────────────────────────────────────────────
+// ── Page 2 — Style Knobs ──────────────────────────────────────────────────────
+//
+// 2×2 grid. Each cell demonstrates one style dimension with a CW+CCW pair.
 
-fn render_page_knobs(frame: &mut Frame, area: Rect, tick: u64) {
-    let [top, bottom] =
+fn page_knobs(frame: &mut Frame, area: Rect, tick: u64) {
+    let [top, bot] =
         Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(area);
     let [tl, tr] =
         Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(top);
     let [bl, br] =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(bottom);
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(bot);
 
-    render_arc_width_section(frame, tl, tick);
-    render_track_section(frame, tr, tick);
-    render_fade_section(frame, bl, tick);
-    render_arc_char_section(frame, br, tick);
+    knob_cell(
+        frame,
+        tl,
+        tick,
+        "Arc width  narrow (arc=5) vs wide (arc=20)",
+        Color::LightRed,
+        |frame, inner, tick, _title, color| {
+            let [top_half, bot_half] =
+                Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .areas(inner);
+            render_pair(
+                frame,
+                top_half,
+                tick,
+                "arc_width = 5   (narrow)",
+                1,
+                color,
+                |t, s| {
+                    BarSpinner::new(t)
+                        .arc_width(5)
+                        .arc_color(color)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                },
+            );
+            render_pair(
+                frame,
+                bot_half,
+                tick,
+                "arc_width = 20  (wide)",
+                1,
+                color,
+                |t, s| {
+                    BarSpinner::new(t)
+                        .arc_width(20)
+                        .arc_color(color)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                },
+            );
+        },
+    );
+
+    knob_cell(
+        frame,
+        tr,
+        tick,
+        "Track  Rail vs Empty",
+        Color::LightYellow,
+        |frame, inner, tick, _title, color| {
+            let [top_half, bot_half] =
+                Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .areas(inner);
+            render_pair(
+                frame,
+                top_half,
+                tick,
+                "track = Rail  (⣀ baseline)",
+                1,
+                color,
+                |t, s| {
+                    BarSpinner::new(t)
+                        .track(BarTrack::Rail)
+                        .arc_color(color)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                },
+            );
+            render_pair(
+                frame,
+                bot_half,
+                tick,
+                "track = Empty  (arc floats)",
+                1,
+                color,
+                |t, s| {
+                    BarSpinner::new(t)
+                        .track(BarTrack::Empty)
+                        .arc_color(color)
+                        .dim_color(Color::Black)
+                        .spin(s)
+                },
+            );
+        },
+    );
+
+    knob_cell(
+        frame,
+        bl,
+        tick,
+        "Fade width  sharp vs soft",
+        Color::LightMagenta,
+        |frame, inner, tick, _title, color| {
+            let [top_half, bot_half] =
+                Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .areas(inner);
+            render_pair(
+                frame,
+                top_half,
+                tick,
+                "fade_width = 0  (sharp ⣿)",
+                1,
+                color,
+                |t, s| {
+                    BarSpinner::new(t)
+                        .fade_width(0)
+                        .arc_color(color)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                },
+            );
+            render_pair(
+                frame,
+                bot_half,
+                tick,
+                "fade_width = 3  (soft ⠉⠛⠿⣿)",
+                1,
+                color,
+                |t, s| {
+                    BarSpinner::new(t)
+                        .fade_width(3)
+                        .arc_color(color)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                },
+            );
+        },
+    );
+
+    knob_cell(
+        frame,
+        br,
+        tick,
+        "Arc char  full vs light",
+        Color::LightCyan,
+        |frame, inner, tick, _title, color| {
+            let [top_half, bot_half] =
+                Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .areas(inner);
+            render_pair(
+                frame,
+                top_half,
+                tick,
+                "arc_char = 0xFF  ⣿  full",
+                1,
+                color,
+                |t, s| {
+                    BarSpinner::new(t)
+                        .arc_char(0xFF)
+                        .arc_color(color)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                },
+            );
+            render_pair(
+                frame,
+                bot_half,
+                tick,
+                "arc_char = 0x3F  ⠿  light",
+                1,
+                color,
+                |t, s| {
+                    BarSpinner::new(t)
+                        .arc_char(0x3F)
+                        .arc_color(color)
+                        .dim_color(Color::DarkGray)
+                        .spin(s)
+                },
+            );
+        },
+    );
 }
 
-// ── arc width
-const ARC_WIDTHS: &[(usize, &str)] = &[
-    (3, "arc=3   narrow"),
-    (6, "arc=6"),
-    (10, "arc=10  wide"),
-    (0, "arc=auto"),
-];
-
-fn render_arc_width_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = section_block!("Arc width  .arc_width(n)", Color::LightRed);
-    render_knob_rows(frame, outer, area, tick, |frame, i, row, tick| {
-        let &(arc_w, label) = &ARC_WIDTHS[i];
-        let label_w = (label.len() as u16 + 2).min(row.width.saturating_sub(4));
-        let spinner_w = row.width.saturating_sub(label_w);
-        let [spin_area, lbl_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Length(label_w)])
-                .areas(row);
-        frame.render_widget(
-            BarSpinner::new(tick)
-                .arc_width(arc_w)
-                .arc_color(Color::LightRed)
-                .dim_color(Color::DarkGray),
-            spin_area,
-        );
-        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); dim)), lbl_area);
-    });
-}
-
-// ── track style
-const TRACK_CONFIGS: &[(BarTrack, &str)] = &[
-    (BarTrack::Rail, "Rail  ⣀  default"),
-    (BarTrack::Full, "Full  ⣿"),
-    (BarTrack::Empty, "Empty ⠀  float"),
-    (BarTrack::Custom(0x09), "Custom 0x09  ⠉"),
-];
-
-fn render_track_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = section_block!("Track  .track(BarTrack::…)", Color::LightYellow);
-    render_knob_rows(frame, outer, area, tick, |frame, i, row, tick| {
-        let &(track, label) = &TRACK_CONFIGS[i];
-        let label_w = (label.len() as u16 + 2).min(row.width.saturating_sub(4));
-        let spinner_w = row.width.saturating_sub(label_w);
-        let [spin_area, lbl_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Length(label_w)])
-                .areas(row);
-        frame.render_widget(
-            BarSpinner::new(tick)
-                .track(track)
-                .arc_color(Color::Yellow)
-                .dim_color(Color::DarkGray),
-            spin_area,
-        );
-        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); dim)), lbl_area);
-    });
-}
-
-// ── fade width
-const FADE_CONFIGS: &[(usize, &str)] = &[
-    (0, "fade=0  sharp  ⣿"),
-    (1, "fade=1  subtle"),
-    (2, "fade=2"),
-    (3, "fade=3  default  ⠉⠛⠿⣿"),
-];
-
-fn render_fade_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = section_block!("Fade  .fade_width(n)", Color::LightMagenta);
-    render_knob_rows(frame, outer, area, tick, |frame, i, row, tick| {
-        let &(fw, label) = &FADE_CONFIGS[i];
-        let label_w = (label.len() as u16 + 2).min(row.width.saturating_sub(4));
-        let spinner_w = row.width.saturating_sub(label_w);
-        let [spin_area, lbl_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Length(label_w)])
-                .areas(row);
-        frame.render_widget(
-            BarSpinner::new(tick)
-                .fade_width(fw)
-                .arc_color(Color::Magenta)
-                .dim_color(Color::DarkGray),
-            spin_area,
-        );
-        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); dim)), lbl_area);
-    });
-}
-
-// ── arc char
-const ARC_CHAR_CONFIGS: &[(u8, &str)] = &[
-    (0xFF, "0xFF  ⣿  full (default)"),
-    (0x7F, "0x7F  ⡿  7 dots"),
-    (0x3F, "0x3F  ⠿  6 dots"),
-    (0x1B, "0x1B  ⠛  4 dots"),
-];
-
-fn render_arc_char_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = section_block!("Arc char  .arc_char(byte)", Color::LightCyan);
-    render_knob_rows(frame, outer, area, tick, |frame, i, row, tick| {
-        let &(byte, label) = &ARC_CHAR_CONFIGS[i];
-        let label_w = (label.len() as u16 + 2).min(row.width.saturating_sub(4));
-        let spinner_w = row.width.saturating_sub(label_w);
-        let [spin_area, lbl_area] =
-            Layout::horizontal([Constraint::Length(spinner_w), Constraint::Length(label_w)])
-                .areas(row);
-        frame.render_widget(
-            BarSpinner::new(tick)
-                .arc_char(byte)
-                .arc_color(Color::Cyan)
-                .dim_color(Color::DarkGray),
-            spin_area,
-        );
-        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); dim)), lbl_area);
-    });
-}
-
-/// Generic helper: draw a section block and allocate N equal rows for a
-/// caller-supplied render closure.  All four style-knob sections share this.
-fn render_knob_rows<F>(
-    frame: &mut Frame,
-    block: Block<'_>,
-    area: Rect,
-    tick: u64,
-    mut render_row: F,
-) where
-    F: FnMut(&mut Frame, usize, Rect, u64),
+/// Draw a rounded titled cell and call `inner` with the inner area.
+fn knob_cell<F>(frame: &mut Frame, area: Rect, tick: u64, title: &str, color: Color, inner_fn: F)
+where
+    F: FnOnce(&mut Frame, Rect, u64, &str, Color),
 {
+    let block = Block::bordered()
+        .title(format!(" {title} "))
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
+        .border_style(sty!(color));
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
+    inner_fn(frame, inner_area, tick, title, color);
+}
+
+// ── Page 3 — Presets ──────────────────────────────────────────────────────────
+
+fn page_presets(frame: &mut Frame, area: Rect, tick: u64) {
+    let block = Block::bordered()
+        .title(" Presets — BarSpinner::name(tick) ")
+        .title_alignment(Alignment::Center)
+        .border_type(BorderType::Rounded)
+        .border_style(sty!(Color::White));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let n = 4usize;
-    let row_h = (inner.height / n as u16).max(1);
-    let constraints: Vec<Constraint> = (0..n)
-        .map(|_| Constraint::Length(row_h))
-        .chain([Constraint::Min(0)])
-        .collect();
-    let rows = Layout::vertical(constraints).split(inner);
-
-    for i in 0..n {
-        if i >= rows.len().saturating_sub(1) {
-            break;
-        }
-        render_row(frame, i, rows[i], tick);
-    }
-}
-
-// ── Page 3: Presets ───────────────────────────────────────────────────────────
-
-fn render_page_presets(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = section_block!("Presets — BarSpinner::preset(tick)", Color::White);
-    let inner = outer.inner(area);
-    frame.render_widget(outer, area);
-
-    struct Preset {
-        label: &'static str,
-        desc: &'static str,
-        height: usize,
-        color: Color,
-    }
-
-    let presets: &[(fn(u64) -> BarSpinner<'static>, Preset)] = &[
+    type CtorFn = fn(u64) -> BarSpinner<'static>;
+    let presets: &[(CtorFn, &str, usize, Color)] = &[
         (
             BarSpinner::zed,
-            Preset {
-                label: "BarSpinner::zed(tick)",
-                desc: "1 row · cyan · Rail track · default settings",
-                height: 1,
-                color: Color::Cyan,
-            },
+            "BarSpinner::zed(tick)     ·  1 row  ·  cyan  ·  Rail",
+            1,
+            Color::Cyan,
         ),
         (
             BarSpinner::claude,
-            Preset {
-                label: "BarSpinner::claude(tick)",
-                desc: "2 rows · orange · Rail track",
-                height: 2,
-                color: Color::Rgb(255, 165, 0),
-            },
+            "BarSpinner::claude(tick)  ·  2 rows ·  orange · Rail",
+            2,
+            Color::Rgb(255, 165, 0),
         ),
         (
             BarSpinner::minimal,
-            Preset {
-                label: "BarSpinner::minimal(tick)",
-                desc: "1 row · white · Empty track — arc floats",
-                height: 1,
-                color: Color::White,
-            },
+            "BarSpinner::minimal(tick) ·  1 row  ·  white ·  Empty (arc floats)",
+            1,
+            Color::White,
         ),
         (
             BarSpinner::solid,
-            Preset {
-                label: "BarSpinner::solid(tick)",
-                desc: "1 row · cyan · Full track · sharp edges",
-                height: 1,
-                color: Color::Cyan,
-            },
+            "BarSpinner::solid(tick)   ·  1 row  ·  cyan  ·  Full · fade=0",
+            1,
+            Color::Cyan,
         ),
     ];
 
-    // Layout: for each preset, a name+desc header row + the spinner itself.
-    let row_unit = 1u16; // 1 header + height rows + 1 gap
-    let constraints: Vec<Constraint> = presets
+    let per: Vec<u16> = presets
         .iter()
-        .flat_map(|(_, p)| {
-            [
-                Constraint::Length(1),               // label
-                Constraint::Length(p.height as u16), // spinner
-                Constraint::Length(1),               // gap
-            ]
-        })
+        .map(|&(_, _, h, _)| 1 + 2 * h as u16 + 1)
+        .collect();
+    let constraints: Vec<Constraint> = per
+        .iter()
+        .map(|&h| Constraint::Length(h))
         .chain([Constraint::Min(0)])
         .collect();
-    let _ = row_unit;
-    let rows = Layout::vertical(constraints).split(inner);
+    let slots = Layout::vertical(constraints).split(inner);
 
-    for (i, (ctor, p)) in presets.iter().enumerate() {
-        let base = i * 3;
-        if base + 1 >= rows.len() {
+    for (i, &(ctor, label, height, color)) in presets.iter().enumerate() {
+        if i >= slots.len().saturating_sub(1) {
             break;
         }
-        let lbl_row = rows[base];
-        let spin_row = rows[base + 1];
-
-        // Label row: "BarSpinner::zed(tick)  ·  desc"
-        frame.render_widget(
-            Paragraph::new(Line::from(vec![
-                sp!(p.label; p.color, b),
-                sp!("  ·  "; dim),
-                sp!(p.desc; dim),
-            ])),
-            lbl_row,
-        );
-
-        // Spinner row: full width
-        frame.render_widget(ctor(tick), spin_row);
+        render_pair(frame, slots[i], tick, label, height, color, |t, s| {
+            ctor(t).spin(s)
+        });
     }
 }
