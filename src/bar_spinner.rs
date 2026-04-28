@@ -100,13 +100,13 @@ impl BarTrack {
 
 /// Map an edge distance to the appropriate [`FADE`] byte.
 ///
-/// - `fade_width = 0` → no ramp; all arc cells use `FADE[3]` (full `⣿`).
+/// - `fade_width = 0` → no ramp; all arc cells use `arc_byte`.
 /// - `fade_width = 1` → only the outermost column fades.
-/// - `fade_width = 3` → default three-column ramp (`⠉ ⠛ ⠿ ⣿`).
+/// - `fade_width = 3` → default three-column ramp (`⠉ ⠛ ⠿ → arc_byte`).
 #[inline]
-fn fade_byte(from_edge: usize, fade_width: usize) -> u8 {
+fn fade_byte(from_edge: usize, fade_width: usize, arc_byte: u8) -> u8 {
     if fade_width == 0 || from_edge >= fade_width {
-        FADE[3]
+        arc_byte
     } else {
         FADE[(from_edge * 3).div_ceil(fade_width).min(2)]
     }
@@ -177,6 +177,7 @@ impl RectEngine {
         dim_color: Color,
         fade_width: usize,
         track_byte: u8,
+        arc_byte: u8,
     ) -> Vec<Line<'static>> {
         let arc_end = self.anchor + self.arc_cols;
 
@@ -186,7 +187,7 @@ impl RectEngine {
                     .map(|ci| {
                         let (byte, color) = if ci >= self.anchor && ci < arc_end {
                             let from_edge = (ci - self.anchor).min(arc_end - 1 - ci);
-                            (fade_byte(from_edge, fade_width), arc_color)
+                            (fade_byte(from_edge, fade_width, arc_byte), arc_color)
                         } else {
                             (track_byte, dim_color)
                         };
@@ -238,9 +239,10 @@ impl RectEngine {
 /// # Field Defaults
 ///
 /// | Field           | Default                     |
-/// |-----------------|-----------------------------|
+/// |-----------------|-----------------------------||
 /// | `track`         | [`BarTrack::Rail`]          |
 /// | `fade_width`    | `3`                         |
+/// | `arc_byte`      | `0xFF` (`⣿`)               |
 #[derive(Debug, Clone)]
 pub struct BarSpinner<'a> {
     tick: u64,
@@ -262,12 +264,75 @@ pub struct BarSpinner<'a> {
     track: BarTrack,
     /// Fade ramp width in character columns (default 3; 0 = sharp cutoff).
     fade_width: usize,
+    /// Braille byte used for the fully-lit arc centre cells (default `0xFF` = `⣿`).
+    arc_byte: u8,
     block: Option<Block<'a>>,
     style: Style,
     alignment: Alignment,
 }
 
 impl<'a> BarSpinner<'a> {
+    // ── Presets ───────────────────────────────────────────────────────────────
+
+    /// **Zed-style** preset — 1 row, cyan arc, subtle Rail track, clockwise.
+    ///
+    /// ```
+    /// use tui_spinner::BarSpinner;
+    /// let s = BarSpinner::zed(42);
+    /// ```
+    #[must_use]
+    pub fn zed(tick: u64) -> Self {
+        Self::new(tick)
+            .height(1)
+            .arc_color(Color::Cyan)
+            .dim_color(Color::DarkGray)
+    }
+
+    /// **Claude-style** preset — 2 rows, warm-orange arc, Rail track, clockwise.
+    ///
+    /// ```
+    /// use tui_spinner::BarSpinner;
+    /// let s = BarSpinner::claude(42);
+    /// ```
+    #[must_use]
+    pub fn claude(tick: u64) -> Self {
+        Self::new(tick)
+            .height(2)
+            .arc_color(Color::Rgb(255, 165, 0))
+            .dim_color(Color::DarkGray)
+    }
+
+    /// **Minimal** preset — 1 row, white arc, Empty track (arc floats on space).
+    ///
+    /// ```
+    /// use tui_spinner::BarSpinner;
+    /// let s = BarSpinner::minimal(42);
+    /// ```
+    #[must_use]
+    pub fn minimal(tick: u64) -> Self {
+        Self::new(tick)
+            .height(1)
+            .arc_color(Color::White)
+            .dim_color(Color::Black)
+            .track(BarTrack::Empty)
+    }
+
+    /// **Solid** preset — 1 row, cyan arc, Full track, sharp zero-fade edges.
+    ///
+    /// ```
+    /// use tui_spinner::BarSpinner;
+    /// let s = BarSpinner::solid(42);
+    /// ```
+    #[must_use]
+    pub fn solid(tick: u64) -> Self {
+        Self::new(tick)
+            .height(1)
+            .arc_color(Color::Cyan)
+            .dim_color(Color::DarkGray)
+            .track(BarTrack::Full)
+            .fade_width(0)
+    }
+
     /// Creates a new [`BarSpinner`] with defaults:
     /// auto-width, 1-row height, clockwise start, cyan arc, dark-gray track,
     /// 1 tick per step, auto arc width.
@@ -292,6 +357,7 @@ impl<'a> BarSpinner<'a> {
             dim_color: Color::DarkGray,
             track: BarTrack::Rail,
             fade_width: 3,
+            arc_byte: 0xFF,
             block: None,
             style: Style::default(),
             alignment: Alignment::Left,
@@ -455,6 +521,31 @@ impl<'a> BarSpinner<'a> {
         self
     }
 
+    /// Sets the braille byte for the fully-lit arc centre cells (default `0xFF` = `⣿`).
+    ///
+    /// Use any braille byte to change the arc density.  The fade ramp always
+    /// starts from `⠉` and tapers *up to* this value.
+    ///
+    /// | Example byte | Glyph | Dots |
+    /// |---|---|---|
+    /// | `0xFF` | `⣿` | 8 — full (default) |
+    /// | `0x7F` | `⡿` | 7 |
+    /// | `0x3F` | `⠿` | 6 |
+    /// | `0x1B` | `⠛` | 4 |
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::BarSpinner;
+    ///
+    /// let light = BarSpinner::new(0).arc_char(0x3F); // ⠿ lighter arc
+    /// ```
+    #[must_use]
+    pub fn arc_char(mut self, byte: u8) -> Self {
+        self.arc_byte = byte;
+        self
+    }
+
     /// Wraps the spinner in a [`Block`].
     ///
     /// # Examples
@@ -524,6 +615,7 @@ impl<'a> BarSpinner<'a> {
             self.dim_color,
             self.fade_width,
             self.track.byte(),
+            self.arc_byte,
         )
     }
 }
@@ -671,7 +763,7 @@ mod tests {
     fn arc_edges_use_fade_bytes() {
         // Build a wide engine so there is a full-density centre.
         let e = RectEngine::build(20, 1, 12, Spin::Clockwise);
-        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE);
+        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF);
         assert_eq!(lines.len(), 1);
         let spans = &lines[0].spans;
 
@@ -696,7 +788,7 @@ mod tests {
     #[test]
     fn dim_columns_use_dim_byte() {
         let e = RectEngine::build(20, 1, 6, Spin::Clockwise);
-        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE);
+        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF);
         let spans = &lines[0].spans;
         let dim_char = char::from_u32(0x2800 + u32::from(DIM_BYTE)).unwrap();
         // Columns before the arc anchor should all be DIM_BYTE.
@@ -850,6 +942,44 @@ mod tests {
         assert_eq!(s.ticks_per_step, 3);
         assert_eq!(s.arc_color, Color::Blue);
         assert_eq!(s.dim_color, Color::Black);
+    }
+
+    #[test]
+    fn arc_char_changes_centre_byte() {
+        let e = RectEngine::build(20, 1, 10, Spin::Clockwise);
+        // Default arc_byte = 0xFF → centre cell is ⣿
+        let lines_default = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF);
+        // Custom arc_byte = 0x3F → centre cell is ⠿
+        let lines_custom = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0x3F);
+        assert_ne!(
+            lines_default, lines_custom,
+            "different arc_byte produces different output"
+        );
+        // The centre span in lines_custom should be ⠿ (U+283F)
+        let centre_idx = e.anchor + e.arc_cols / 2;
+        let centre_char = lines_custom[0].spans[centre_idx]
+            .content
+            .chars()
+            .next()
+            .unwrap();
+        assert_eq!(
+            centre_char, '\u{283F}',
+            "centre cell should be ⠿ when arc_byte=0x3F"
+        );
+    }
+
+    #[test]
+    fn preset_zed_defaults() {
+        let s = BarSpinner::zed(0);
+        assert_eq!(s.height, 1);
+        assert_eq!(s.arc_color, Color::Cyan);
+    }
+
+    #[test]
+    fn preset_solid_has_full_track_and_zero_fade() {
+        let s = BarSpinner::solid(0);
+        assert_eq!(s.track, BarTrack::Full);
+        assert_eq!(s.fade_width, 0);
     }
 
     #[test]
