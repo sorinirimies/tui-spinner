@@ -47,6 +47,18 @@ path = "examples/bar_spinner.rs"
 name = "flux_spinner"
 path = "examples/flux_spinner.rs"
 
+[[example]]
+name = "square_spinner"
+path = "examples/square_spinner.rs"
+
+[[example]]
+name = "circle_spinner"
+path = "examples/circle_spinner.rs"
+
+[[example]]
+name = "linear_spinner"
+path = "examples/linear_spinner.rs"
+
 [profile.release]
 opt-level = 3
 lto = true

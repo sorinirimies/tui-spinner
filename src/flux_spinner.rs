@@ -79,7 +79,12 @@ use crate::Spin;
 /// | `SQUARE`    | `◰ ◳ ◲ ◱`                     | 4      | White square, one filled quadrant   |
 /// | `DICE`      | `⚀ ⚁ ⚂ ⚃ ⚄ ⚅`               | 6      | Dice faces one to six         |
 /// | `BAR`       | `▁ ▂ ▃ ▄ ▅ ▆ ▇ █`             | 8      | Sub-block growing bar         |
-/// | `CORNERS`   | `┌ ┐ ┘ └`                     | 4      | Box-drawing corners rotate    |
+/// | `CORNERS`     | `┌ ┐ ┘ └`                     | 4      | Box-drawing corners rotate    |
+/// | `CIRCLE_FILL` | `○ ◔ ◑ ◕ ●`                   | 5      | Circle filling clockwise      |
+/// | `PISTON`      | `▁ ▃ ▅ ▇ █ ▇ ▅ ▃`             | 8      | Bouncing bar (repeats)        |
+/// | `STAR`        | `✶ ✷ ✸ ✹`                     | 4      | Braille-asterisk star ramp    |
+/// | `PAIR`        | `⠉ ⠘ ⠰ ⢠ ⣀ ⡄ ⠆ ⠃`         | 8      | Two dots rotating together    |
+/// | `DIAMOND`     | `◇ ◈ ◆ ◈`                     | 4      | Diamond pulse (repeats)       |
 ///
 /// # Examples
 ///
@@ -177,6 +182,35 @@ impl FluxFrames {
     ///
     /// `┌ ┐ ┘ └`
     pub const CORNERS: &'static [char] = &['┌', '┐', '┘', '└'];
+
+    /// Circle gradually filling clockwise through five stages.
+    ///
+    /// `○ ◔ ◑ ◕ ●`
+    pub const CIRCLE_FILL: &'static [char] = &['○', '◔', '◑', '◕', '●'];
+
+    /// Bar that bounces from one-eighth height to full and back.
+    ///
+    /// `▁ ▃ ▅ ▇ █ ▇ ▅ ▃`
+    ///
+    /// `▃`, `▅`, `▇` are intentionally repeated — that is the bounce return.
+    pub const PISTON: &'static [char] = &['▁', '▃', '▅', '▇', '█', '▇', '▅', '▃'];
+
+    /// Four braille-asterisk star glyphs increasing in density.
+    ///
+    /// `✶ ✷ ✸ ✹`
+    pub const STAR: &'static [char] = &['✶', '✷', '✸', '✹'];
+
+    /// Two adjacent braille dots rotating clockwise around the cell.
+    ///
+    /// `⠉ ⠘ ⠰ ⢠ ⣀ ⡄ ⠆ ⠃`
+    pub const PAIR: &'static [char] = &['⠉', '⠘', '⠰', '⢠', '⣀', '⡄', '⠆', '⠃'];
+
+    /// Diamond pulsing between hollow, dotted, and solid.
+    ///
+    /// `◇ ◈ ◆ ◈`
+    ///
+    /// `◈` is intentionally repeated — that is the pulse return step.
+    pub const DIAMOND: &'static [char] = &['◇', '◈', '◆', '◈'];
 }
 
 // ── Public widget ─────────────────────────────────────────────────────────────
@@ -561,12 +595,18 @@ mod tests {
         assert!(!FluxFrames::PULSE.is_empty());
         assert!(!FluxFrames::BAR.is_empty());
         assert!(!FluxFrames::CORNERS.is_empty());
+        assert!(!FluxFrames::CIRCLE_FILL.is_empty());
+        assert!(!FluxFrames::PISTON.is_empty());
+        assert!(!FluxFrames::STAR.is_empty());
+        assert!(!FluxFrames::PAIR.is_empty());
+        assert!(!FluxFrames::DIAMOND.is_empty());
     }
 
     #[test]
     fn all_presets_have_distinct_chars_within_set() {
         // PULSE deliberately repeats chars (it pulses, not rotates).
         // BOUNCE repeats ⠒ by design (return step).
+        // PISTON and DIAMOND repeat chars by design (bounce/pulse return steps).
         for (name, preset) in [
             ("BRAILLE", FluxFrames::BRAILLE),
             ("ORBIT", FluxFrames::ORBIT),
@@ -582,6 +622,9 @@ mod tests {
             ("DICE", FluxFrames::DICE),
             ("BAR", FluxFrames::BAR),
             ("CORNERS", FluxFrames::CORNERS),
+            ("CIRCLE_FILL", FluxFrames::CIRCLE_FILL),
+            ("STAR", FluxFrames::STAR),
+            ("PAIR", FluxFrames::PAIR),
         ] {
             let unique: std::collections::HashSet<char> = preset.iter().copied().collect();
             assert_eq!(unique.len(), preset.len(), "{name} has duplicate chars");

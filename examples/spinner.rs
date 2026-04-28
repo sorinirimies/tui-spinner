@@ -26,6 +26,46 @@ use tui_spinner::{
     Centre, CircleSpinner, Direction, LinearSpinner, LinearStyle, Spin, SquareSpinner,
 };
 
+// ── Style macros ──────────────────────────────────────────────────────────────
+
+/// Build a [`Style`] quickly.
+macro_rules! sty {
+    (dim) => {
+        Style::default().fg(Color::DarkGray)
+    };
+    ($c:expr) => {
+        Style::default().fg($c)
+    };
+    ($c:expr, b) => {
+        Style::default().fg($c).add_modifier(Modifier::BOLD)
+    };
+}
+
+/// Build a styled [`Span`] quickly.
+macro_rules! sp {
+    ($t:expr; dim) => {
+        Span::styled($t, sty!(dim))
+    };
+    ($t:expr; $c:expr) => {
+        Span::styled($t, sty!($c))
+    };
+    ($t:expr; $c:expr, b) => {
+        Span::styled($t, sty!($c, b))
+    };
+}
+
+/// Build a rounded bordered [`Block`] with a centred title and uniform padding.
+macro_rules! section_block {
+    ($title:expr, $color:expr) => {
+        Block::bordered()
+            .title(concat!(" ", $title, " "))
+            .title_alignment(Alignment::Center)
+            .border_type(BorderType::Rounded)
+            .border_style(sty!($color))
+            .padding(Padding::uniform(1))
+    };
+}
+
 // ── App state ─────────────────────────────────────────────────────────────────
 
 struct App {
@@ -96,14 +136,14 @@ fn render_header(frame: &mut Frame, area: Rect) {
         .title(" tui-spinner Demo ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan))
+        .border_style(sty!(Color::Cyan))
         .padding(Padding::horizontal(1));
 
     let text = Paragraph::new(
         "Square · Filled · CW  ·  Square · Empty · CCW  ·  Circle  ·  LinearSpinner",
     )
     .alignment(Alignment::Center)
-    .style(Style::default().fg(Color::Gray));
+    .style(sty!(Color::Gray));
 
     frame.render_widget(text.block(block), area);
 }
@@ -111,23 +151,13 @@ fn render_header(frame: &mut Frame, area: Rect) {
 fn render_footer(frame: &mut Frame, area: Rect) {
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::DarkGray))
+        .border_style(sty!(dim))
         .padding(Padding::horizontal(1));
 
     let text = Line::from(vec![
-        Span::styled(
-            "q",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
+        sp!("q"; Color::Cyan, b),
         Span::raw(" / "),
-        Span::styled(
-            "Esc",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
+        sp!("Esc"; Color::Cyan, b),
         Span::raw("  Quit"),
     ]);
 
@@ -157,12 +187,7 @@ fn render_content(frame: &mut Frame, area: Rect, tick: u64) {
 // ── Col 1 — Square, Filled centre ─────────────────────────────────────────────
 
 fn render_square_filled_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" Square · Filled · CW ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan))
-        .padding(Padding::uniform(1));
+    let outer_block = section_block!("Square · Filled · CW", Color::Cyan);
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
@@ -170,11 +195,7 @@ fn render_square_filled_column(frame: &mut Frame, area: Rect, tick: u64) {
     let rows = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(inner);
 
     frame.render_widget(
-        Paragraph::new(Span::styled(
-            "size 2      size 3      size 4",
-            Style::default().fg(Color::DarkGray),
-        ))
-        .alignment(Alignment::Center),
+        Paragraph::new(sp!("size 2      size 3      size 4"; dim)).alignment(Alignment::Center),
         rows[0],
     );
 
@@ -203,12 +224,7 @@ fn render_square_filled_column(frame: &mut Frame, area: Rect, tick: u64) {
 // ── Col 2 — Square, Empty centre ──────────────────────────────────────────────
 
 fn render_square_empty_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" Square · Empty · CCW ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Green))
-        .padding(Padding::uniform(1));
+    let outer_block = section_block!("Square · Empty · CCW", Color::Green);
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
@@ -216,11 +232,7 @@ fn render_square_empty_column(frame: &mut Frame, area: Rect, tick: u64) {
     let rows = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(inner);
 
     frame.render_widget(
-        Paragraph::new(Span::styled(
-            "size 2      size 3      size 4",
-            Style::default().fg(Color::DarkGray),
-        ))
-        .alignment(Alignment::Center),
+        Paragraph::new(sp!("size 2      size 3      size 4"; dim)).alignment(Alignment::Center),
         rows[0],
     );
 
@@ -248,12 +260,7 @@ fn render_square_empty_column(frame: &mut Frame, area: Rect, tick: u64) {
 // ── Col 3 — Circle ────────────────────────────────────────────────────────────
 
 fn render_circle_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" Circle ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::LightCyan))
-        .padding(Padding::uniform(1));
+    let outer_block = section_block!("Circle", Color::LightCyan);
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
@@ -311,8 +318,7 @@ fn render_circle_column(frame: &mut Frame, area: Rect, tick: u64) {
         Layout::vertical([Constraint::Length(title_h), Constraint::Min(0)]).areas(inner);
 
     frame.render_widget(
-        Paragraph::new(Span::styled("radius", Style::default().fg(Color::DarkGray)))
-            .alignment(Alignment::Center),
+        Paragraph::new(sp!("radius"; dim)).alignment(Alignment::Center),
         title_area,
     );
 
@@ -351,13 +357,7 @@ fn render_circle_column(frame: &mut Frame, area: Rect, tick: u64) {
                 .ticks_per_step(3),
             spinner_area,
         );
-        frame.render_widget(
-            Paragraph::new(Span::styled(
-                format!(" {label}"),
-                Style::default().fg(arc_col),
-            )),
-            lbl_area,
-        );
+        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); arc_col)), lbl_area);
     }
 }
 
@@ -373,12 +373,7 @@ const DOT_STYLES: &[(LinearStyle, Color, &str)] = &[
 ];
 
 fn render_linear_column(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer_block = Block::bordered()
-        .title(" LinearSpinner ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Yellow))
-        .padding(Padding::uniform(1));
+    let outer_block = section_block!("LinearSpinner", Color::Yellow);
 
     let inner = outer_block.inner(area);
     frame.render_widget(outer_block, area);
@@ -394,11 +389,7 @@ fn render_linear_column(frame: &mut Frame, area: Rect, tick: u64) {
 fn render_vertical_dots(frame: &mut Frame, area: Rect, tick: u64) {
     let [title, body] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
     frame.render_widget(
-        Paragraph::new(Span::styled(
-            "Vertical bounce",
-            Style::default().fg(Color::DarkGray),
-        ))
-        .alignment(Alignment::Center),
+        Paragraph::new(sp!("Vertical bounce"; dim)).alignment(Alignment::Center),
         title,
     );
 
@@ -424,24 +415,14 @@ fn render_vertical_dots(frame: &mut Frame, area: Rect, tick: u64) {
                 .inactive_color(Color::DarkGray),
             spinner_area,
         );
-        frame.render_widget(
-            Paragraph::new(Span::styled(
-                format!(" {label}"),
-                Style::default().fg(color),
-            )),
-            label_area,
-        );
+        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); color)), label_area);
     }
 }
 
 fn render_horizontal_dots(frame: &mut Frame, area: Rect, tick: u64) {
     let [title, body] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
     frame.render_widget(
-        Paragraph::new(Span::styled(
-            "Horizontal scroll",
-            Style::default().fg(Color::DarkGray),
-        ))
-        .alignment(Alignment::Center),
+        Paragraph::new(sp!("Horizontal scroll"; dim)).alignment(Alignment::Center),
         title,
     );
 
@@ -478,10 +459,7 @@ fn render_horizontal_dots(frame: &mut Frame, area: Rect, tick: u64) {
             spinner_area,
         );
         frame.render_widget(
-            Paragraph::new(Span::styled(
-                format!(" {total}t {lit}lit"),
-                Style::default().fg(Color::DarkGray),
-            )),
+            Paragraph::new(sp!(format!(" {total}t {lit}lit"); dim)),
             label_area,
         );
     }

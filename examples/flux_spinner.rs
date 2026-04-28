@@ -1,7 +1,7 @@
 //! # FluxSpinner Example
 //!
-//! Displays all [`FluxFrames`] presets in a compact **5 × 4 grid** (16 presets +
-//! 4 live custom-frames tiles).
+//! Displays all [`FluxFrames`] presets in a compact **5 × 5 grid** (21 presets +
+//! 4 live custom-frames tiles = 25 cells).
 //!
 //! Each tile shows:
 //! - The preset name as the border title
@@ -128,7 +128,17 @@ static TILES: &[Tile] = &[
     preset!(FluxFrames::SQUARE, "SQUARE", Color::Rgb(255, 140, 200)),
     preset!(FluxFrames::DICE, "DICE", Color::Rgb(255, 220, 100)),
     preset!(FluxFrames::BAR, "BAR", Color::Rgb(160, 255, 160)),
-    // Row 5 — live custom-frames demos
+    preset!(
+        FluxFrames::CIRCLE_FILL,
+        "CIRCLEFILL",
+        Color::Rgb(100, 210, 255)
+    ),
+    // Row 5
+    preset!(FluxFrames::PISTON, "PISTON", Color::Rgb(255, 160, 80)),
+    preset!(FluxFrames::STAR, "STAR", Color::Rgb(255, 240, 120)),
+    preset!(FluxFrames::PAIR, "PAIR", Color::Rgb(140, 255, 200)),
+    preset!(FluxFrames::DIAMOND, "DIAMOND", Color::Rgb(255, 160, 220)),
+    // Row 5 col 5 + Row 6 — live custom-frames demos
     custom!(&['○', '◎', '●', '◎'], "RINGS", Color::Rgb(100, 200, 255)),
     custom!(
         &['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
@@ -139,8 +149,8 @@ static TILES: &[Tile] = &[
     custom!(&['♩', '♪', '♫', '♬'], "MUSIC", Color::Rgb(255, 180, 220)),
 ];
 
-const GRID_ROWS: usize = 5;
-const GRID_COLS: usize = 4;
+const GRID_ROWS: usize = 4;
+const GRID_COLS: usize = 7;
 /// Each cell is exactly this many terminal rows tall: 2 borders + 2 content.
 const CELL_H: u16 = 4;
 /// Ticks held per animation step — raise to slow animation down.
@@ -256,6 +266,7 @@ fn render_grid(frame: &mut Frame, area: Rect, tick: u64) {
     let col_cs: Vec<Constraint> = (0..GRID_COLS)
         .map(|_| Constraint::Ratio(1, GRID_COLS as u32))
         .collect();
+    // 5 × 5 = 25 cells: 21 presets + 4 custom demos.
 
     let rows = Layout::vertical(row_cs).split(area);
 

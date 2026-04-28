@@ -31,6 +31,46 @@ use ratatui::{
 use std::time::{Duration, Instant};
 use tui_spinner::{BarSpinner, Spin};
 
+// ── Style macros ──────────────────────────────────────────────────────────────
+
+/// Build a [`Style`] quickly.
+macro_rules! sty {
+    (dim) => {
+        Style::default().fg(Color::DarkGray)
+    };
+    ($c:expr) => {
+        Style::default().fg($c)
+    };
+    ($c:expr, b) => {
+        Style::default().fg($c).add_modifier(Modifier::BOLD)
+    };
+}
+
+/// Build a styled [`Span`] quickly.
+macro_rules! sp {
+    ($t:expr; dim) => {
+        Span::styled($t, sty!(dim))
+    };
+    ($t:expr; $c:expr) => {
+        Span::styled($t, sty!($c))
+    };
+    ($t:expr; $c:expr, b) => {
+        Span::styled($t, sty!($c, b))
+    };
+}
+
+/// Build a rounded bordered [`Block`] with a centred title and padding.
+macro_rules! section_block {
+    ($title:expr, $color:expr) => {
+        Block::bordered()
+            .title(concat!(" ", $title, " "))
+            .title_alignment(Alignment::Center)
+            .border_type(BorderType::Rounded)
+            .border_style(sty!($color))
+            .padding(Padding::uniform(1))
+    };
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 struct App {
@@ -98,11 +138,11 @@ fn render_header(frame: &mut Frame, area: Rect) {
         .title(" BarSpinner — Zed / Claude-style bouncing bar ")
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(sty!(Color::Cyan));
 
     let subtitle = Paragraph::new("full-width bars · gradient arc · ping-pong bounce")
         .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::DarkGray))
+        .style(sty!(dim))
         .block(block);
 
     frame.render_widget(subtitle, area);
@@ -111,22 +151,12 @@ fn render_header(frame: &mut Frame, area: Rect) {
 fn render_footer(frame: &mut Frame, area: Rect) {
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(sty!(dim));
 
     let line = Line::from(vec![
-        Span::styled(
-            "q",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
+        sp!("q"; Color::Cyan, b),
         Span::raw(" / "),
-        Span::styled(
-            "Esc",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
+        sp!("Esc"; Color::Cyan, b),
         Span::raw("  Quit"),
     ]);
 
@@ -203,12 +233,7 @@ const ZED_CONFIGS: &[(Color, Color, Spin, u64, &str)] = &[
 ];
 
 fn render_zed_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = Block::bordered()
-        .title(" Zed-style  ·  1 row  ·  height(1) ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan))
-        .padding(Padding::horizontal(1));
+    let outer = section_block!("Zed-style  ·  1 row  ·  height(1)", Color::Cyan);
 
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
@@ -263,12 +288,7 @@ const CLAUDE_CONFIGS: &[(Color, Color, Spin, u64, &str)] = &[
 ];
 
 fn render_claude_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = Block::bordered()
-        .title(" Claude-style  ·  2 rows  ·  height(2) ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Yellow))
-        .padding(Padding::horizontal(1));
+    let outer = section_block!("Claude-style  ·  2 rows  ·  height(2)", Color::Yellow);
 
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
@@ -316,12 +336,7 @@ const THICK_CONFIGS: &[(Color, Color, Spin, u64, &str)] = &[
 ];
 
 fn render_thick_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = Block::bordered()
-        .title(" Thick  ·  3 rows  ·  height(3) ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Green))
-        .padding(Padding::horizontal(1));
+    let outer = section_block!("Thick  ·  3 rows  ·  height(3)", Color::Green);
 
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
@@ -364,12 +379,7 @@ const PAIR_CONFIGS: &[(Color, u64, &str)] = &[
 ];
 
 fn render_pairs_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = Block::bordered()
-        .title(" CW ↻ vs CCW ↺  ·  same tick ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::LightCyan))
-        .padding(Padding::horizontal(1));
+    let outer = section_block!("CW ↻ vs CCW ↺  ·  same tick", Color::LightCyan);
 
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
@@ -429,12 +439,7 @@ const ARC_WIDTHS: &[(usize, &str)] = &[
 ];
 
 fn render_arc_section(frame: &mut Frame, area: Rect, tick: u64) {
-    let outer = Block::bordered()
-        .title(" Arc width comparison ")
-        .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::LightRed))
-        .padding(Padding::horizontal(1));
+    let outer = section_block!("Arc width comparison", Color::LightRed);
 
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
@@ -467,13 +472,7 @@ fn render_arc_section(frame: &mut Frame, area: Rect, tick: u64) {
                 .ticks_per_step(1),
             spinner_area,
         );
-        frame.render_widget(
-            Paragraph::new(Span::styled(
-                format!(" {label}"),
-                Style::default().fg(Color::DarkGray),
-            )),
-            label_area,
-        );
+        frame.render_widget(Paragraph::new(sp!(format!(" {label}"); dim)), label_area);
     }
 }
 
@@ -522,10 +521,7 @@ fn render_bar_row(
     };
 
     frame.render_widget(
-        Paragraph::new(Span::styled(
-            format!(" {label}"),
-            Style::default().fg(arc_color),
-        )),
+        Paragraph::new(sp!(format!(" {label}"); arc_color)),
         label_row,
     );
 }
