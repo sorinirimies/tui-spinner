@@ -229,10 +229,6 @@ remotes:
 push:
     git push origin main
 
-# Push tags to GitHub
-push-tags:
-    git push origin --tags
-
 # Push main branch to Gitea
 push-gitea:
     git push gitea main
@@ -254,7 +250,7 @@ push-all:
         echo "✅ Pushed to GitHub, Gitea, and Gitea Starscream!"
     fi
 
-# Force-push to all remotes (continues on failure)
+# Force-push the current branch to all remotes
 push-all-force:
     #!/usr/bin/env sh
     failed=""
@@ -264,14 +260,43 @@ push-all-force:
     if [ -n "$failed" ]; then
         echo "⚠️  Failed to force-push to:$failed"
     else
-        echo "✅ Force-pushed to all remotes!"
+        echo "✅ Force-pushed to GitHub, Gitea, and Gitea Starscream!"
     fi
+
+# Pull the current branch from GitHub (origin)
+pull:
+    git pull origin main
+
+# Pull the current branch from Gitea
+pull-gitea:
+    git pull gitea main
+
+# Pull the current branch from Gitea Starscream
+pull-gitea-starscream:
+    git pull gitea_starscream main
+
+# Pull the current branch from all remotes (continues on failure)
+pull-all:
+    #!/usr/bin/env sh
+    failed=""
+    git pull origin main             || failed="$failed origin"
+    git pull gitea main              || failed="$failed gitea"
+    git pull gitea_starscream main   || failed="$failed gitea_starscream"
+    if [ -n "$failed" ]; then
+        echo "⚠️  Failed to pull from:$failed"
+    else
+        echo "✅ Pulled from GitHub, Gitea, and Gitea Starscream!"
+    fi
+
+# Push all tags to GitHub
+push-tags:
+    git push origin --tags
 
 # Push tags to Gitea
 push-tags-gitea:
     git push gitea --tags
 
-# Push tags to all remotes (continues on failure)
+# Push all tags to all remotes (continues on failure)
 push-tags-all:
     #!/usr/bin/env sh
     failed=""
@@ -284,25 +309,89 @@ push-tags-all:
         echo "✅ Tags pushed to all remotes!"
     fi
 
-# Push branch + tags to all remotes (after a release bump)
-push-release-all:
+# Push the latest commit + tags to every remote (quality-gated; continues on failure)
+push-release-all: check-all
     #!/usr/bin/env sh
     failed=""
     git push --follow-tags origin main             || failed="$failed origin"
     git push --follow-tags gitea main              || failed="$failed gitea"
     git push --follow-tags gitea_starscream main   || failed="$failed gitea_starscream"
     if [ -n "$failed" ]; then
-        echo "⚠️  Failed to push release to:$failed"
+        echo "⚠️  Failed to push to:$failed"
     else
-        echo "✅ Release pushed to all remotes!"
+        echo "✅ Latest commit + tags pushed to all remotes."
     fi
 
-# Force-sync all Gitea remotes from GitHub (overwrite with origin state)
-sync-giteas:
+# -- Release workflows -----------------------------------------------------
+
+# Bump, commit, tag, then push to GitHub — triggers Release workflow
+release version: bump
+    @echo "Pushing release v{{ version }} to GitHub..."
+    git push --follow-tags origin main
+    @echo "✅ Release v{{ version }} pushed — Release workflow will trigger automatically."
+
+# Bump, commit, tag, then push to Gitea only
+release-gitea version: bump
+    @echo "Pushing release v{{ version }} to Gitea..."
+    git push --follow-tags gitea main
+    @echo "✅ Release v{{ version }} live on Gitea."
+
+# Bump, commit, tag, then push to Gitea Starscream only
+release-gitea-starscream version: bump
+    @echo "Pushing release v{{ version }} to Gitea Starscream..."
+    git push --follow-tags gitea_starscream main
+    @echo "✅ Release v{{ version }} live on Gitea Starscream."
+
+# Bump, commit, tag, then push to all remotes (continues on failure)
+release-all version: bump
+    #!/usr/bin/env sh
+    echo "Pushing release v{{ version }} to all remotes..."
+    failed=""
+    git push --follow-tags origin main             || failed="$failed origin"
+    git push --follow-tags gitea main              || failed="$failed gitea"
+    git push --follow-tags gitea_starscream main   || failed="$failed gitea_starscream"
+    if [ -n "$failed" ]; then
+        echo "⚠️  Release v{{ version }} failed to push to:$failed"
+    else
+        echo "✅ Release v{{ version }} pushed to GitHub, Gitea, and Gitea Starscream!"
+    fi
+
+# Manually re-trigger the Release workflow for an existing tag via the gh CLI
+release-retrigger version:
+    @command -v gh >/dev/null 2>&1 || { \
+        echo "GitHub CLI (gh) not found. Install from https://cli.github.com"; exit 1; \
+    }
+    @echo "Manually dispatching Release workflow for tag v{{ version }}..."
+    gh workflow run release.yml --field tag=v{{ version }}
+    @echo "✅ Dispatched — check progress in GitHub Actions."
+
+# -- Gitea sync ------------------------------------------------------------
+
+# Force-sync Gitea with GitHub
+sync-gitea:
     git push gitea main --force
     git push gitea --tags --force
+    @echo "✅ Gitea force-synced with GitHub."
+
+# Force-sync Gitea Starscream with GitHub
+sync-gitea-starscream:
     git push gitea_starscream main --force
     git push gitea_starscream --tags --force
+    @echo "✅ Gitea Starscream force-synced with GitHub."
+
+# Force-sync all Gitea instances with GitHub (continues on failure)
+sync-all-gitea:
+    #!/usr/bin/env sh
+    failed=""
+    git push gitea main --force                  || failed="$failed gitea"
+    git push gitea --tags --force                || failed="$failed gitea-tags"
+    git push gitea_starscream main --force       || failed="$failed gitea_starscream"
+    git push gitea_starscream --tags --force     || failed="$failed gitea_starscream-tags"
+    if [ -n "$failed" ]; then
+        echo "⚠️  Failed to sync:$failed"
+    else
+        echo "✅ All Gitea instances force-synced with GitHub."
+    fi
 
 # -- Gitea setup -----------------------------------------------------------
 
@@ -313,3 +402,7 @@ setup-gitea url: _check-nu
 # Add or update the 'gitea_starscream' remote (usage: just setup-gitea-starscream <url>)
 setup-gitea-starscream url: _check-nu
     nu scripts/setup_gitea.nu --remote gitea_starscream {{ url }}
+
+# Migrate this project to dual GitHub + Gitea hosting (interactive)
+migrate-gitea: _check-nu
+    nu scripts/migrate_to_gitea.nu

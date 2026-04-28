@@ -181,22 +181,44 @@ fn render_direction_col(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let n = RADII.len();
-    let row_constraints: Vec<Constraint> = RADII
+    // Exact height per spinner row.
+    let heights: Vec<u16> = RADII
         .iter()
-        .map(|&(r, _)| {
-            let h = CircleSpinner::new(0).radius(r).char_size().1.max(1);
-            Constraint::Length(h)
-        })
-        .chain([Constraint::Min(0)])
+        .map(|&(r, _)| CircleSpinner::new(0).radius(r).char_size().1.max(1))
         .collect();
-    let rows = Layout::vertical(row_constraints).split(inner);
+
+    // 1-row breathing gap between spinners.
+    let gap = 1u16;
+    let total_h: u16 = heights.iter().sum::<u16>() + gap * (RADII.len() as u16).saturating_sub(1);
+
+    // Vertically centre the whole block.
+    let top_pad = inner.height.saturating_sub(total_h) / 2;
+
+    // Build constraints: optional top pad + interleaved content / gap rows.
+    let mut constraints: Vec<Constraint> = Vec::new();
+    if top_pad > 0 {
+        constraints.push(Constraint::Length(top_pad));
+    }
+    for (i, &h) in heights.iter().enumerate() {
+        constraints.push(Constraint::Length(h));
+        if i + 1 < heights.len() {
+            constraints.push(Constraint::Length(gap));
+        }
+    }
+    constraints.push(Constraint::Min(0)); // absorb leftover
+
+    let rows = Layout::vertical(constraints).split(inner);
+
+    // If a top-pad row was inserted, content rows start at index 1;
+    // then every second row (0, 2, 4, …) relative to that offset is a gap.
+    let offset = usize::from(top_pad > 0);
 
     for (i, &(radius, arc_color)) in RADII.iter().enumerate() {
-        if i >= rows.len().saturating_sub(1) {
+        let row_idx = offset + i * 2;
+        if row_idx >= rows.len() {
             break;
         }
-        let row = rows[i];
+        let row = rows[row_idx];
         let spinner_w = CircleSpinner::new(0).radius(radius).char_size().0;
 
         let [spin_area, lbl_area] =
@@ -216,6 +238,4 @@ fn render_direction_col(
             lbl_area,
         );
     }
-    // suppress unused-variable warning for n
-    let _ = n;
 }
