@@ -297,10 +297,9 @@ impl RectEngine {
 
     /// Advance one step, reversing or wrapping at each edge.
     fn walk(&mut self) {
-        let max_anchor = self.char_w.saturating_sub(self.arc_cols);
-
         match self.motion {
             BarMotion::Bounce => {
+                let max_anchor = self.char_w.saturating_sub(self.arc_cols);
                 if self.going_forward {
                     if self.anchor < max_anchor {
                         self.anchor += 1;
@@ -314,17 +313,14 @@ impl RectEngine {
                 }
             }
             BarMotion::Loop => {
-                // Direction is fixed; wrap at the boundary instead of reversing.
+                // Anchor travels the full 0..char_w range modularly.
+                // render_lines uses (ci - anchor) % char_w to detect the arc,
+                // so the glyph phases in at the leading edge while phasing out
+                // at the trailing edge in the same frame.
                 if self.going_forward {
-                    if self.anchor < max_anchor {
-                        self.anchor += 1;
-                    } else {
-                        self.anchor = 0;
-                    }
-                } else if self.anchor > 0 {
-                    self.anchor -= 1;
+                    self.anchor = (self.anchor + 1) % self.char_w;
                 } else {
-                    self.anchor = max_anchor;
+                    self.anchor = (self.anchor + self.char_w - 1) % self.char_w;
                 }
             }
         }
@@ -340,33 +336,56 @@ impl RectEngine {
         arc_byte: u8,
         style_chars: Option<(char, char)>,
     ) -> Vec<Line<'static>> {
-        let arc_end = self.anchor + self.arc_cols;
+        let char_w = self.char_w;
+        let arc_cols = self.arc_cols;
 
         (0..self.char_h)
             .map(|_| {
-                let spans: Vec<Span<'static>> = (0..self.char_w)
+                let spans: Vec<Span<'static>> = (0..char_w)
                     .map(|ci| {
+                        // Determine whether this column is inside the arc and,
+                        // if so, its distance from the nearer arc edge.
+                        let (in_arc, from_edge) = match self.motion {
+                            BarMotion::Bounce => {
+                                let arc_end = self.anchor + arc_cols;
+                                if ci >= self.anchor && ci < arc_end {
+                                    let fe = (ci - self.anchor).min(arc_end - 1 - ci);
+                                    (true, fe)
+                                } else {
+                                    (false, 0)
+                                }
+                            }
+                            BarMotion::Loop => {
+                                // Modular offset: how far past `anchor` is `ci`?
+                                // This correctly handles the wrap-around case where
+                                // part of the arc is near the right edge and part
+                                // has already reappeared at the left edge.
+                                let offset = (ci + char_w - self.anchor) % char_w;
+                                if offset < arc_cols {
+                                    let fe = offset.min(arc_cols - 1 - offset);
+                                    (true, fe)
+                                } else {
+                                    (false, 0)
+                                }
+                            }
+                        };
+
                         let (ch, color) = if let Some((arc_ch, track_ch)) = style_chars {
-                            // Symbol style — one char per cell, no braille fade.
-                            if ci >= self.anchor && ci < arc_end {
+                            if in_arc {
                                 (arc_ch, arc_color)
                             } else {
                                 (track_ch, dim_color)
                             }
+                        } else if in_arc {
+                            let byte = fade_byte(from_edge, fade_width, arc_byte);
+                            let ch = char::from_u32(0x2800 + u32::from(byte)).unwrap_or('\u{2800}');
+                            (ch, arc_color)
                         } else {
-                            // Braille style — density-gradient rendering.
-                            if ci >= self.anchor && ci < arc_end {
-                                let from_edge = (ci - self.anchor).min(arc_end - 1 - ci);
-                                let byte = fade_byte(from_edge, fade_width, arc_byte);
-                                let ch =
-                                    char::from_u32(0x2800 + u32::from(byte)).unwrap_or('\u{2800}');
-                                (ch, arc_color)
-                            } else {
-                                let ch = char::from_u32(0x2800 + u32::from(track_byte))
-                                    .unwrap_or('\u{2800}');
-                                (ch, dim_color)
-                            }
+                            let ch = char::from_u32(0x2800 + u32::from(track_byte))
+                                .unwrap_or('\u{2800}');
+                            (ch, dim_color)
                         };
+
                         Span::styled(ch.to_string(), Style::default().fg(color))
                     })
                     .collect();
@@ -1280,28 +1299,25 @@ mod tests {
     #[test]
     fn loop_motion_wraps_at_right_edge() {
         let mut e = RectEngine::build(20, 1, 4, Spin::Clockwise, BarMotion::Loop);
-        let max = e.char_w - e.arc_cols;
-        // Walk until anchor reaches max_anchor.
-        for _ in 0..100 {
-            if e.anchor == max {
+        // Loop anchor travels 0..char_w modularly (not 0..char_w-arc_cols).
+        let last = e.char_w - 1;
+        for _ in 0..200 {
+            if e.anchor == last {
                 break;
             }
             e.walk();
         }
-        assert_eq!(e.anchor, max, "anchor should reach max_anchor");
-        // One more step must wrap back to 0.
+        assert_eq!(e.anchor, last, "anchor should reach char_w-1");
         e.walk();
-        assert_eq!(e.anchor, 0, "Loop mode should wrap to 0");
-        // Direction flag must NOT have flipped.
-        assert!(e.going_forward, "Loop mode must not reverse direction");
+        assert_eq!(e.anchor, 0, "Loop CW should wrap to 0");
+        assert!(e.going_forward, "Loop must not flip direction");
     }
 
     #[test]
     fn loop_motion_wraps_at_left_edge_ccw() {
         let mut e = RectEngine::build(20, 1, 4, Spin::CounterClockwise, BarMotion::Loop);
-        let max = e.char_w - e.arc_cols;
-        // Walk until anchor reaches 0.
-        for _ in 0..100 {
+        // CCW starts at char_w - arc_cols; walk it to 0.
+        for _ in 0..200 {
             if e.anchor == 0 {
                 break;
             }
@@ -1309,7 +1325,7 @@ mod tests {
         }
         assert_eq!(e.anchor, 0);
         e.walk();
-        assert_eq!(e.anchor, max, "CCW Loop should wrap to max_anchor");
+        assert_eq!(e.anchor, e.char_w - 1, "CCW Loop should wrap to char_w-1");
         assert!(!e.going_forward);
     }
 
