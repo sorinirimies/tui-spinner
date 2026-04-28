@@ -1,5 +1,4 @@
 # Git LFS — track generated GIF demos so they don't bloat the repo history
 *.gif filter=lfs diff=lfs merge=lfs -text
-
 # Explicitly cover the VHS generated output directory
 examples/vhs/generated/*.gif filter=lfs diff=lfs merge=lfs -text

@@ -7,224 +7,377 @@
 
 Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) TUI applications.
 
-## Preview
-
-![Spinner Demo](examples/vhs/generated/spinner-demo.gif)
+---
 
 ## Widgets
 
-| Widget | Description |
-|--------|-------------|
-| `LinearSpinner` | Horizontal scrolling window or vertical bouncing dot — configurable axis, flow direction, and symbol style. |
-| `RectSpinner` | Braille-dot arc that travels around the perimeter of a rectangle. Supports clockwise/counter-clockwise spin and filled/empty centre. |
-| `CircleSpinner` | Braille-dot arc rotating around a circular ring computed with the midpoint circle algorithm. |
-| `SquareSpinner` | Legacy alias for `RectSpinner` with `RectShape::Square`. Prefer `RectSpinner` for new code. |
+| Widget | Shape | Motion | Key options |
+|--------|-------|--------|-------------|
+| [`LinearSpinner`](#linearspinner) | Straight line | Scrolling window or bouncing dot | direction, flow, style |
+| [`SquareSpinner`](#squarespinner) | Square braille ring | Rotating arc | size, spin, centre |
+| [`CircleSpinner`](#circlespinner) | Circular braille ring | Rotating arc | radius, spin, arc_len |
+| [`RectSpinner`](#rectspinner) | Rectangle braille ring | Rotating arc | shape, spin, centre |
+| [`BarSpinner`](#barspinner) | Solid horizontal bar | Bouncing glow (ping-pong) | width, height, arc_width, spin |
+| [`FluxSpinner`](#fluxspinner) | Single-character glyph | Cycling frame sequence | frames, width, phase_step, spin |
 
-## Quick Start
+---
+
+## Previews
+
+### SquareSpinner — Filled & Empty · CW ↻ and CCW ↺
+
+![SquareSpinner Demo](examples/vhs/generated/square-spinner-demo.gif)
+
+### CircleSpinner — Clockwise ↻ and Counter-Clockwise ↺
+
+![CircleSpinner Demo](examples/vhs/generated/circle-spinner-demo.gif)
+
+### LinearSpinner — Orientation & Direction
+
+![LinearSpinner Demo](examples/vhs/generated/linear-spinner-demo.gif)
+
+### BarSpinner — Zed / Claude-style bouncing bar
+
+![BarSpinner Demo](examples/vhs/generated/bar-spinner-demo.gif)
+
+### FluxSpinner — All frame presets
+
+![FluxSpinner Demo](examples/vhs/generated/flux-spinner-demo.gif)
+
+---
+
+## Installation
 
 ```toml
 [dependencies]
 tui-spinner = "0.1"
 ```
 
+---
+
+## Quick Start
+
 ```rust
 use ratatui::style::Color;
 use tui_spinner::{
-    Centre, CircleSpinner, Direction, Flow, LinearSpinner,
-    LinearStyle, RectShape, RectSpinner, Spin,
+    BarSpinner, Centre, CircleSpinner, Direction, FluxFrames, FluxSpinner,
+    Flow, LinearSpinner, LinearStyle, RectShape, RectSpinner, Spin, SquareSpinner,
 };
 
-// Horizontal ellipsis — default
-let h = LinearSpinner::new(tick);
-
-// Vertical bounce with diamond symbols, reversed
+// Vertical bouncing dot (Zed / Copilot style)
 let v = LinearSpinner::new(tick)
     .direction(Direction::Vertical)
-    .flow(Flow::Backwards)
-    .linear_style(LinearStyle::Diamond)
+    .linear_style(LinearStyle::Braille)
     .active_color(Color::Cyan);
 
-// Square braille arc, clockwise, filled centre
-let sq = RectSpinner::new(tick)
-    .shape(RectShape::Square(3))
+// Square arc, clockwise, filled centre
+let sq = SquareSpinner::new(tick)
+    .size(3)
     .spin(Spin::Clockwise)
     .centre(Centre::Filled)
-    .outer_color(Color::Cyan)
-    .inner_color(Color::DarkGray);
+    .arc_color(Color::Cyan);
 
-// Circular arc spinner
+// Circular arc, counter-clockwise
 let circle = CircleSpinner::new(tick)
     .radius(5)
     .spin(Spin::CounterClockwise)
-    .arc_color(Color::Magenta)
+    .arc_color(Color::Magenta);
+
+// Zed / Claude-style bouncing bar — fills available width automatically
+let bar = BarSpinner::new(tick)
+    .arc_color(Color::Cyan)
     .dim_color(Color::DarkGray);
+
+// Minimal 1×1 status-bar spinner
+let flux = FluxSpinner::new(tick)
+    .color(Color::Cyan);
+
+// Wave of rotating glyphs
+let wave = FluxSpinner::new(tick)
+    .frames(FluxFrames::ORBIT)
+    .width(8)
+    .phase_step(1)
+    .color(Color::LightBlue);
 ```
 
-## Running the Example
+All widgets are **stateless** — just pass a monotonically-increasing `tick: u64` counter:
+
+```rust
+struct App { tick: u64 }
+
+fn update(app: &mut App) {
+    app.tick = app.tick.wrapping_add(1);
+}
+```
+
+---
+
+## Running the Examples
 
 ```sh
-cargo run --example spinner
+cargo run --example square_spinner   # SquareSpinner: Filled/Empty × CW/CCW
+cargo run --example circle_spinner   # CircleSpinner: CW and CCW columns
+cargo run --example linear_spinner   # LinearSpinner: all styles × orientation × direction
+cargo run --example bar_spinner      # BarSpinner: Zed/Claude-style bouncing bar
+cargo run --example flux_spinner     # FluxSpinner: all frame presets grid
+cargo run --example spinner          # Combined overview of all widgets
 ```
+
+---
 
 ## Widget Reference
 
 ### `LinearSpinner`
 
-Horizontal scrolling or vertical bounce animation along a straight axis.
+Horizontal scrolling window or vertical bouncing dot.
 
 ```text
-Horizontal (default):   ●●·  →  ·●●  →  ··●  →  ●··  → …
-Vertical:               ●    ·    ·
-                         ·    ●    ·
-                         ·    ·    ●   → bounces back
+Horizontal (Forwards):   ●●·  →  ·●●  →  ··●  →  ●··  → …
+Horizontal (Backwards):  ··●  →  ·●●  →  ●●·  →  ●··  → …
+Vertical:                ●       ·       ·
+                         ·   →   ●   →   ·   → bounces back
+                         ·       ·       ●
 ```
 
-| Builder method | Default | Description |
-|---|---|---|
+| Builder | Default | Description |
+|---------|---------|-------------|
 | `direction(Direction)` | `Horizontal` | Animation axis |
-| `flow(Flow)` | `Forwards` | Animation flow direction |
-| `linear_style(LinearStyle)` | `Classic` | Symbol pair for active/inactive slots |
-| `total_slots(n)` | `3` | Total number of slots (row width or column height) |
-| `lit_slots(n)` | `2` | Number of simultaneously lit slots (horizontal only) |
-| `ticks_per_step(n)` | `3` | Ticks held per animation step (higher = slower) |
-| `active_color(c)` | `White` | Colour of lit symbols |
-| `inactive_color(c)` | `DarkGray` | Colour of dim symbols |
+| `flow(Flow)` | `Forwards` | Animation direction |
+| `linear_style(LinearStyle)` | `Classic` | Symbol set for active/inactive slots |
+| `total_slots(n)` | `3` | Total number of slots |
+| `lit_slots(n)` | `2` | Simultaneously lit slots (horizontal only) |
+| `ticks_per_step(n)` | `3` | Ticks per step (higher = slower) |
+| `active_color(c)` | `White` | Lit symbol colour |
+| `inactive_color(c)` | `DarkGray` | Dim symbol colour |
 | `block(b)` | — | Optional `Block` wrapper |
-| `style(s)` | — | Base style for the widget area |
+| `style(s)` | — | Base widget style |
 
 #### `Direction`
 
 | Variant | Description |
 |---------|-------------|
-| `Horizontal` | A window of lit symbols scrolls across a row (default) |
-| `Vertical` | A single lit symbol bounces up and down a column |
+| `Horizontal` | Scrolling window across a row (default) |
+| `Vertical` | Single dot bouncing up and down a column |
 
 #### `Flow`
 
 | Variant | Description |
 |---------|-------------|
-| `Forwards` | Normal playback — left-to-right / upward-first bounce (default) |
-| `Backwards` | Reversed playback — right-to-left / downward-first bounce |
+| `Forwards` | Normal direction — left-to-right / upward-first (default) |
+| `Backwards` | Reversed — right-to-left / downward-first |
 
 #### `LinearStyle`
 
-| Variant | Active | Inactive | Description |
-|---------|--------|----------|-------------|
-| `Classic` | `●` | `·` | Filled / middle dot (default) |
-| `Square` | `■` | `□` | Filled / open square |
-| `Diamond` | `◆` | `◇` | Filled / open diamond |
-| `Bar` | `┃` | `│` | Heavy / light vertical bar |
-| `Braille` | `⣿` | `⠿` | Full / sparse braille |
-| `Arrow` | `▶`/`▼` | `▷`/`▽` | Direction-aware arrow |
+| Variant | Active | Inactive |
+|---------|--------|----------|
+| `Classic` | `●` | `·` |
+| `Square` | `■` | `□` |
+| `Diamond` | `◆` | `◇` |
+| `Bar` | `┃` | `│` |
+| `Braille` | `⣿` | `⠿` |
+| `Arrow` | `▶`/`▼` | `▷`/`▽` |
+
+---
+
+### `SquareSpinner`
+
+Braille-dot arc rotating around a square ring, with optional filled centre.
+
+| Builder | Default | Description |
+|---------|---------|-------------|
+| `size(n)` | `2` | Arc thickness / square size (2–8) |
+| `spin(Spin)` | `Clockwise` | Rotation direction |
+| `centre(Centre)` | `Filled` | Interior fill mode |
+| `arc_color(c)` | `White` | Rotating arc colour |
+| `dim_color(c)` | `DarkGray` | Centre fill / dim ring colour |
+| `ticks_per_step(n)` | `1` | Ticks per arc step |
+| `alignment(a)` | `Left` | Horizontal alignment |
+| `block(b)` | — | Optional `Block` wrapper |
+
+> **Note:** `SquareSpinner` is a convenience wrapper around `RectSpinner`.
+> For new code prefer `RectSpinner::new(tick).shape(RectShape::Square(n))`.
+
+---
+
+### `CircleSpinner`
+
+Braille-dot arc rotating around a circular ring computed with the midpoint
+circle algorithm.
+
+| Builder | Default | Description |
+|---------|---------|-------------|
+| `radius(n)` | `4` | Circle radius in braille dots |
+| `arc_len(n)` | `0` (auto ¼) | Bright arc length in perimeter dots |
+| `spin(Spin)` | `Clockwise` | Rotation direction |
+| `ticks_per_step(n)` | `1` | Ticks per arc step |
+| `arc_color(c)` | `White` | Bright arc colour |
+| `dim_color(c)` | `DarkGray` | Dim ring colour |
+| `alignment(a)` | `Left` | Horizontal alignment |
+| `block(b)` | — | Optional `Block` wrapper |
+
+Use `.char_size()` → `(cols, rows)` to query the exact rendered size.
 
 ---
 
 ### `RectSpinner`
 
-A comet-like braille-dot arc that travels around the perimeter of a rectangle.
+Braille-dot arc rotating around a configurable rectangle.
 
-| Builder method | Default | Description |
-|---|---|---|
-| `shape(RectShape)` | `Square(2)` | Shape and size of the rectangle |
-| `spin(Spin)` | `Clockwise` | Arc rotation direction |
-| `centre(Centre)` | `Filled` | Whether the interior is filled or empty |
-| `outer_color(c)` | `Cyan` | Colour of the rotating arc |
-| `inner_color(c)` | `DarkGray` | Colour of the centre fill |
-| `ticks_per_step(n)` | `1` | Ticks per arc step (higher = slower) |
+| Builder | Default | Description |
+|---------|---------|-------------|
+| `shape(RectShape)` | `Square(2)` | Shape and size |
+| `spin(Spin)` | `Clockwise` | Rotation direction |
+| `centre(Centre)` | `Filled` | Interior fill mode |
+| `outer_color(c)` | `Cyan` | Rotating arc colour |
+| `inner_color(c)` | `DarkGray` | Centre fill colour |
+| `ticks_per_step(n)` | `1` | Ticks per arc step |
 | `alignment(a)` | `Left` | Horizontal alignment |
 | `block(b)` | — | Optional `Block` wrapper |
-| `style(s)` | — | Base style for the widget area |
 
 #### `RectShape`
 
 | Variant | Description |
 |---------|-------------|
-| `Square(n)` | Square character-cell output; `n` is the arc thickness / size parameter (2–8) |
+| `Square(n)` | Square output; `n` = arc thickness / size (2–8) |
 
-#### `Spin`
+---
+
+### `Spin` (shared)
 
 | Variant | Description |
 |---------|-------------|
 | `Clockwise` | Arc travels clockwise (default) |
 | `CounterClockwise` | Arc travels counter-clockwise |
 
-#### `Centre`
+### `Centre` (shared)
 
 | Variant | Description |
 |---------|-------------|
 | `Filled` | Solid interior block (default) |
-| `Empty` | No interior fill — only the moving arc is visible |
+| `Empty` | No interior fill |
 
 ---
 
-### `CircleSpinner`
+### `BarSpinner`
 
-A comet-like arc rotating around a circular braille-dot ring. The perimeter is computed with the midpoint circle algorithm and sorted clockwise.
+Zed / Claude-style solid braille bar with a soft glowing arc that bounces
+left and right (ping-pong).  The arc edges taper through a density ramp
+(`⠉ ⠛ ⠿ ⣿`) for a comet-glow look.
 
-| Builder method | Default | Description |
-|---|---|---|
-| `radius(n)` | `4` | Circle radius in braille dots (minimum: 1) |
-| `arc_len(n)` | `0` (auto: ¼ perimeter) | Number of perimeter dots in the bright arc |
-| `spin(Spin)` | `Clockwise` | Arc rotation direction |
-| `ticks_per_step(n)` | `1` | Ticks per arc step (higher = slower) |
-| `arc_color(c)` | `White` | Colour of the rotating bright arc |
-| `dim_color(c)` | `DarkGray` | Colour of the dim background ring |
+Set `width(0)` (the default) to fill the available area automatically.
+
+| Builder | Default | Description |
+|---------|---------|-------------|
+| `width(n)` | `0` (auto-fill) | Fixed column count; `0` = fill area |
+| `height(n)` | `1` | Bar height in rows (1 = thin Zed-style) |
+| `arc_width(n)` | `0` (auto ⅓) | Bright arc width in character columns |
+| `spin(Spin)` | `Clockwise` | Starting direction before first bounce |
+| `ticks_per_step(n)` | `1` | Ticks per step (higher = slower) |
+| `arc_color(c)` | `Cyan` | Bright arc colour |
+| `dim_color(c)` | `DarkGray` | Background track colour |
 | `alignment(a)` | `Left` | Horizontal alignment |
 | `block(b)` | — | Optional `Block` wrapper |
-| `style(s)` | — | Base style for the widget area |
-
-Use `.char_size()` to query the exact rendered size in terminal characters `(cols, rows)`.
-
----
-
-### `SquareSpinner`
-
-> **Legacy alias** — delegates to the same braille-arc engine used by `RectSpinner` with a square shape. Prefer `RectSpinner` for new code.
-
-| Builder method | Default | Description |
-|---|---|---|
-| `size(n)` | `2` | Arc thickness / square size (2–8) |
-| `spin(Spin)` | `Clockwise` | Arc rotation direction |
-| `centre(Centre)` | `Filled` | Interior fill mode |
-| `arc_color(c)` | `White` | Colour of the rotating arc |
-| `dim_color(c)` | `DarkGray` | Colour of the centre fill |
-| `ticks_per_step(n)` | `1` | Ticks per arc step (higher = slower) |
-| `alignment(a)` | `Left` | Horizontal alignment |
-| `block(b)` | — | Optional `Block` wrapper |
-| `style(s)` | — | Base style for the widget area |
-
-Use `.char_size()` to query the exact rendered size in terminal characters `(cols, rows)`.
-
-## Integration Pattern
-
-All widgets are **stateless** — they only need a monotonically increasing `tick: u64` counter that you increment once per render frame. No mutable widget state is required.
 
 ```rust
-use ratatui::Frame;
-use ratatui::layout::Rect;
-use tui_spinner::{Direction, LinearSpinner, RectSpinner, CircleSpinner};
+// Full-width single-row bar (most common usage)
+let bar = BarSpinner::new(tick)
+    .arc_color(Color::Cyan)
+    .dim_color(Color::DarkGray);
 
-struct App { tick: u64 }
-
-fn update(app: &mut App) {
-    app.tick = app.tick.wrapping_add(1);
-}
-
-fn draw(frame: &mut Frame, area: Rect, app: &App) {
-    // Pick any spinner — they all take a tick counter
-    frame.render_widget(
-        LinearSpinner::new(app.tick).direction(Direction::Vertical),
-        area,
-    );
-}
+// Claude-style warm 2-row banner
+let claude = BarSpinner::new(tick)
+    .height(2)
+    .arc_color(Color::Rgb(255, 165, 0))
+    .dim_color(Color::DarkGray);
 ```
+
+---
+
+### `FluxSpinner`
+
+A compact single-character spinner that cycles through a frame sequence.
+At `1×1` it is a minimal status-bar indicator; scaled up with
+[`width`](FluxSpinner::width) / [`height`](FluxSpinner::height) it
+produces a travelling diagonal wave controlled by
+[`phase_step`](FluxSpinner::phase_step).
+
+| Builder | Default | Description |
+|---------|---------|-------------|
+| `frames(f)` | `FluxFrames::BRAILLE` | Frame sequence (any `&'static [char]`) |
+| `width(n)` | `1` | Width in character columns |
+| `height(n)` | `1` | Height in character rows |
+| `spin(Spin)` | `Clockwise` | Frame sequence direction |
+| `ticks_per_step(n)` | `1` | Ticks per frame (higher = slower) |
+| `phase_step(n)` | `1` | Frame offset between adjacent cells |
+| `color(c)` | `Cyan` | Glyph colour |
+| `alignment(a)` | `Left` | Horizontal alignment |
+| `block(b)` | — | Optional `Block` wrapper |
+
+#### `FluxFrames` presets
+
+| Preset | Glyphs | Frames | Description |
+|--------|--------|--------|-------------|
+| `BRAILLE` | `⣾ ⣷ ⣯ ⣟ ⡿ ⢿ ⣽ ⣻` | 8 | Full cell, one dot missing (default) |
+| `ORBIT` | `⠁ ⠈ ⠐ ⠠ ⢀ ⡀ ⠄ ⠂` | 8 | Single dot orbiting |
+| `CLASSIC` | `⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏` | 10 | Classic braille spinner |
+| `LINE` | `│ ╱ ─ ╲` | 4 | Rotating line |
+| `BLOCK` | `▖ ▘ ▝ ▗` | 4 | Quarter-block rotation |
+| `ARC` | `◜ ◝ ◞ ◟` | 4 | Quarter-arc rotation |
+| `CLOCK` | `◷ ◶ ◵ ◴` | 4 | Quarter-circle pie slice |
+| `MOON` | `◓ ◑ ◒ ◐` | 4 | Half-circle moon phase |
+| `TRIANGLES` | `▲ ▶ ▼ ◀` | 4 | Filled triangle rotation |
+| `PULSE` | `⣀ ⣤ ⣶ ⣾ ⣿ ⣾ ⣶ ⣤` | 8 | Braille fill pulse |
+| `BOUNCE` | `⠉ ⠒ ⣀ ⠒` | 4 | Braille dot bouncing |
+| `HALF` | `▀ ▐ ▄ ▌` | 4 | Half-block rotation |
+| `SQUARE` | `◰ ◳ ◲ ◱` | 4 | Filled square quadrant |
+| `DICE` | `⚀ ⚁ ⚂ ⚃ ⚄ ⚅` | 6 | Dice faces |
+| `BAR` | `▁ ▂ ▃ ▄ ▅ ▆ ▇ █` | 8 | Growing bar |
+| `CORNERS` | `┌ ┐ ┘ └` | 4 | Box corners |
+| `CIRCLE_FILL` | `○ ◔ ◑ ◕ ●` | 5 | Circle filling |
+| `PISTON` | `▁ ▃ ▅ ▇ █ ▇ ▅ ▃` | 8 | Bouncing bar |
+| `STAR` | `✶ ✷ ✸ ✹` | 4 | Star density ramp |
+| `PAIR` | `⠉ ⠘ ⠰ ⢠ ⣀ ⡄ ⠆ ⠃` | 8 | Two dots rotating together |
+| `DIAMOND` | `◇ ◈ ◆ ◈` | 4 | Diamond pulse |
+
+Pass **any** `&'static [char]` for a fully custom animation:
+
+```rust
+let custom = FluxSpinner::new(tick)
+    .frames(&['◐', '◓', '◑', '◒'])
+    .color(Color::Cyan);
+```
+
+#### `phase_step` wave effect
+
+```text
+width = 6, phase_step = 1, Clockwise
+⣾⣷⣯⣟⡿⢿   (tick 0)
+⣷⣯⣟⡿⢿⣽   (tick 1)
+⣯⣟⡿⢿⣽⣻   (tick 2)  …
+```
+
+With `Spin::CounterClockwise` the wave travels in the opposite direction.
+
+---
 
 ## Generating Demo GIFs
 
 ```sh
-# Install VHS: https://github.com/charmbracelet/vhs
+# Requires VHS: https://github.com/charmbracelet/vhs
+vhs examples/vhs/square-spinner-demo.tape
+vhs examples/vhs/circle-spinner-demo.tape
+vhs examples/vhs/linear-spinner-demo.tape
+vhs examples/vhs/bar-spinner-demo.tape
+vhs examples/vhs/flux-spinner-demo.tape
+vhs examples/vhs/spinner-demo.tape
+
+# Or via justfile:
 just vhs-all
 ```
+
+GIF files are tracked with **Git LFS** (see `.gitattributes`).
+
+---
 
 ## License
 
