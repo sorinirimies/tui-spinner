@@ -58,7 +58,7 @@ def main [
         print $"($cyan)▸ generating CHANGELOG.md via git-cliff ...($reset)"
         let cliff_result = (do { git-cliff --output CHANGELOG.md } | complete)
         if $cliff_result.exit_code == 0 {
-            let cl_size = (open CHANGELOG.md | str length)
+            let cl_size = (open --raw CHANGELOG.md | str length)
             print $"($green)  ✓ CHANGELOG.md generated \(($cl_size) chars\)($reset)"
         } else {
             print $"($yellow)  ⚠ git-cliff failed to generate CHANGELOG.md($reset)"
