@@ -1,8 +1,12 @@
 //! # FluxSpinner Example
 //!
-//! Displays all [`FluxFrames`] presets in a **4 × 3 grid**.
-//! Every tile shows the preset name, the CW ↻ and CCW ↺ animated glyphs
-//! side by side, the full frame sequence, and the frame count.
+//! Displays all [`FluxFrames`] presets in a **4 × 4 grid** (14 presets +
+//! 2 live custom-frames tiles).  Every tile shows the preset name, the
+//! CW ↻ and CCW ↺ animated glyphs side by side, the full frame sequence,
+//! and the frame count.
+//!
+//! The two **CUSTOM** tiles demonstrate passing any `&'static [char]` slice
+//! directly to [`.frames()`](tui_spinner::FluxSpinner::frames).
 //!
 //! **Controls:** `q` / `Esc` — Quit
 //!
@@ -111,12 +115,6 @@ const PRESETS: &[(&[char], &str, &str, Color)] = &[
     (FluxFrames::BLOCK, "BLOCK", "▖ ▘ ▝ ▗", Color::LightGreen),
     (FluxFrames::ARC, "ARC", "◜ ◝ ◞ ◟", Color::LightCyan),
     (
-        FluxFrames::ARROWS,
-        "ARROWS",
-        "↑ ↗ → ↘ ↓ ↙ ← ↖",
-        Color::LightYellow,
-    ),
-    (
         FluxFrames::CLOCK,
         "CLOCK",
         "◷ ◶ ◵ ◴",
@@ -139,6 +137,46 @@ const PRESETS: &[(&[char], &str, &str, Color)] = &[
         "PULSE",
         "⣀ ⣤ ⣶ ⣾ ⣿ ⣾ ⣶ ⣤",
         Color::LightRed,
+    ),
+    (
+        FluxFrames::BOUNCE,
+        "BOUNCE",
+        "⠉ ⠒ ⣀ ⠒",
+        Color::Rgb(255, 180, 80),
+    ),
+    (
+        FluxFrames::HALF,
+        "HALF",
+        "▀ ▐ ▄ ▌",
+        Color::Rgb(120, 220, 180),
+    ),
+    (
+        FluxFrames::SQUARE,
+        "SQUARE",
+        "◰ ◳ ◲ ◱",
+        Color::Rgb(255, 140, 200),
+    ),
+    (
+        FluxFrames::DICE,
+        "DICE",
+        "⚀ ⚁ ⚂ ⚃ ⚄ ⚅",
+        Color::Rgb(255, 220, 100),
+    ),
+];
+
+/// Live custom-frame tiles — demonstrate `.frames(&[…])` with arbitrary slices.
+const CUSTOM_TILES: &[(&[char], &str, &str, Color)] = &[
+    (
+        &['○', '◎', '●', '◎'],
+        "RINGS",
+        "○ ◎ ● ◎",
+        Color::Rgb(100, 200, 255),
+    ),
+    (
+        &['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+        "ALPHA",
+        "a b c d e f g h",
+        Color::Rgb(180, 255, 180),
     ),
 ];
 
@@ -208,10 +246,12 @@ fn render_footer(frame: &mut Frame, area: Rect) {
 // ── 4 × 3 grid ────────────────────────────────────────────────────────────────
 
 fn render_grid(frame: &mut Frame, area: Rect, tick: u64) {
+    // 4 rows × 4 cols = 16 cells: 14 preset tiles + 2 custom tiles.
     let rows = Layout::vertical([
-        Constraint::Ratio(1, 3),
-        Constraint::Ratio(1, 3),
-        Constraint::Ratio(1, 3),
+        Constraint::Ratio(1, 4),
+        Constraint::Ratio(1, 4),
+        Constraint::Ratio(1, 4),
+        Constraint::Ratio(1, 4),
     ])
     .split(area);
 
@@ -225,12 +265,16 @@ fn render_grid(frame: &mut Frame, area: Rect, tick: u64) {
         .split(row_area);
 
         for (col_idx, &col_area) in cols.iter().enumerate() {
-            let preset_idx = row_idx * 4 + col_idx;
-            if preset_idx < PRESETS.len() {
-                let (frames, name, glyphs, color) = PRESETS[preset_idx];
+            let idx = row_idx * 4 + col_idx;
+            if idx < PRESETS.len() {
+                let (frames, name, glyphs, color) = PRESETS[idx];
                 render_tile(frame, col_area, tick, frames, name, glyphs, color);
-            } else if preset_idx == 11 {
-                render_custom_tile(frame, col_area);
+            } else {
+                let custom_idx = idx - PRESETS.len();
+                if custom_idx < CUSTOM_TILES.len() {
+                    let (frames, name, glyphs, color) = CUSTOM_TILES[custom_idx];
+                    render_custom_tile(frame, col_area, tick, frames, name, glyphs, color);
+                }
             }
         }
     }
@@ -291,11 +335,20 @@ fn render_tile(
     );
 }
 
-fn render_custom_tile(frame: &mut Frame, area: Rect) {
+fn render_custom_tile(
+    frame: &mut Frame,
+    area: Rect,
+    tick: u64,
+    frames: &'static [char],
+    name: &str,
+    glyphs: &str,
+    color: Color,
+) {
     let dim = Style::default().fg(Color::DarkGray);
 
+    // Dashed border to visually distinguish custom tiles from preset tiles.
     let block = Block::bordered()
-        .title(" CUSTOM ")
+        .title(format!(" {name} · custom "))
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded)
         .border_style(dim);
@@ -303,29 +356,38 @@ fn render_custom_tile(frame: &mut Frame, area: Rect) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let [top, mid, bot] = Layout::vertical([
+    let [spinners_area, glyphs_area, hint_area] = Layout::vertical([
         Constraint::Ratio(1, 3),
         Constraint::Ratio(1, 3),
         Constraint::Ratio(1, 3),
     ])
     .areas(inner);
 
+    let cw = frame_char(frames, tick, Spin::Clockwise);
+    let ccw = frame_char(frames, tick, Spin::CounterClockwise);
+    let accent = Style::default().fg(color);
+    let bold_accent = accent.add_modifier(Modifier::BOLD);
+
     render_vcenter(
         frame,
-        top,
-        Line::from(Span::styled("any &'static [char]", dim)),
+        spinners_area,
+        Line::from(vec![
+            Span::styled("↻ ", dim),
+            Span::styled(cw.to_string(), bold_accent),
+            Span::styled("   ", dim),
+            Span::styled(ccw.to_string(), bold_accent),
+            Span::styled(" ↺", dim),
+        ]),
     );
+    render_vcenter(frame, glyphs_area, Line::from(Span::styled(glyphs, accent)));
     render_vcenter(
         frame,
-        mid,
+        hint_area,
         Line::from(Span::styled(
-            ".frames(&['a','b','c'])",
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::ITALIC),
+            format!(".frames(&[…])  {} frames", frames.len()),
+            dim,
         )),
     );
-    render_vcenter(frame, bot, Line::from(Span::styled("· any length ·", dim)));
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

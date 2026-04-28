@@ -70,11 +70,14 @@ use crate::Spin;
 /// | `LINE`     | `│ ╱ ─ ╲`                 | 4      | Rotating line                       |
 /// | `BLOCK`    | `▖ ▘ ▝ ▗`                 | 4      | Quarter-block rotation              |
 /// | `ARC`      | `◜ ◝ ◞ ◟`                 | 4      | Quarter-arc rotation                |
-/// | `ARROWS`    | `↑ ↗ → ↘ ↓ ↙ ← ↖`           | 8      | Eight compass arrows          |
 /// | `CLOCK`     | `◷ ◶ ◵ ◴`                     | 4      | Quarter-circle pie slice      |
 /// | `MOON`      | `◓ ◑ ◒ ◐`                     | 4      | Half-circle moon phase        |
 /// | `TRIANGLES` | `▲ ▶ ▼ ◀`                     | 4      | Filled triangle four dirs     |
 /// | `PULSE`     | `⣀ ⣤ ⣶ ⣾ ⣿ ⣾ ⣶ ⣤`         | 8      | Braille fill pulse            |
+/// | `BOUNCE`    | `⠉ ⠒ ⣀ ⠒`                    | 4      | Braille row bouncing top→mid→bottom |
+/// | `HALF`      | `▀ ▐ ▄ ▌`                     | 4      | Half-block rotating clockwise |
+/// | `SQUARE`    | `◰ ◳ ◲ ◱`                     | 4      | White square, one filled quadrant   |
+/// | `DICE`      | `⚀ ⚁ ⚂ ⚃ ⚄ ⚅`               | 6      | Dice faces one to six         |
 ///
 /// # Examples
 ///
@@ -119,11 +122,6 @@ impl FluxFrames {
     /// `◜ ◝ ◞ ◟`
     pub const ARC: &'static [char] = &['◜', '◝', '◞', '◟'];
 
-    /// Eight compass arrows rotating clockwise.
-    ///
-    /// `↑ ↗ → ↘ ↓ ↙ ← ↖`
-    pub const ARROWS: &'static [char] = &['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
-
     /// Quarter-circle pie slice rotating through four positions.
     ///
     /// `◷ ◶ ◵ ◴`
@@ -143,6 +141,28 @@ impl FluxFrames {
     ///
     /// `⣀ ⣤ ⣶ ⣾ ⣿ ⣾ ⣶ ⣤`
     pub const PULSE: &'static [char] = &['⣀', '⣤', '⣶', '⣾', '⣿', '⣾', '⣶', '⣤'];
+
+    /// Single braille row bouncing top → middle → bottom → middle.
+    ///
+    /// `⠉ ⠒ ⣀ ⠒`
+    ///
+    /// `⠒` is intentionally repeated — that is the bounce return step.
+    pub const BOUNCE: &'static [char] = &['⠉', '⠒', '⣀', '⠒'];
+
+    /// Half-block rotating clockwise through four positions.
+    ///
+    /// `▀ ▐ ▄ ▌`
+    pub const HALF: &'static [char] = &['▀', '▐', '▄', '▌'];
+
+    /// White square with one filled quadrant rotating clockwise.
+    ///
+    /// `◰ ◳ ◲ ◱`
+    pub const SQUARE: &'static [char] = &['◰', '◳', '◲', '◱'];
+
+    /// Dice faces cycling from one to six.
+    ///
+    /// `⚀ ⚁ ⚂ ⚃ ⚄ ⚅`
+    pub const DICE: &'static [char] = &['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 }
 
 // ── Public widget ─────────────────────────────────────────────────────────────
@@ -517,7 +537,10 @@ mod tests {
         assert!(!FluxFrames::LINE.is_empty());
         assert!(!FluxFrames::BLOCK.is_empty());
         assert!(!FluxFrames::ARC.is_empty());
-        assert!(!FluxFrames::ARROWS.is_empty());
+        assert!(!FluxFrames::BOUNCE.is_empty());
+        assert!(!FluxFrames::HALF.is_empty());
+        assert!(!FluxFrames::SQUARE.is_empty());
+        assert!(!FluxFrames::DICE.is_empty());
         assert!(!FluxFrames::CLOCK.is_empty());
         assert!(!FluxFrames::MOON.is_empty());
         assert!(!FluxFrames::TRIANGLES.is_empty());
@@ -527,6 +550,7 @@ mod tests {
     #[test]
     fn all_presets_have_distinct_chars_within_set() {
         // PULSE deliberately repeats chars (it pulses, not rotates).
+        // BOUNCE repeats ⠒ by design (return step).
         for (name, preset) in [
             ("BRAILLE", FluxFrames::BRAILLE),
             ("ORBIT", FluxFrames::ORBIT),
@@ -534,10 +558,12 @@ mod tests {
             ("LINE", FluxFrames::LINE),
             ("BLOCK", FluxFrames::BLOCK),
             ("ARC", FluxFrames::ARC),
-            ("ARROWS", FluxFrames::ARROWS),
             ("CLOCK", FluxFrames::CLOCK),
             ("MOON", FluxFrames::MOON),
             ("TRIANGLES", FluxFrames::TRIANGLES),
+            ("HALF", FluxFrames::HALF),
+            ("SQUARE", FluxFrames::SQUARE),
+            ("DICE", FluxFrames::DICE),
         ] {
             let unique: std::collections::HashSet<char> = preset.iter().copied().collect();
             assert_eq!(unique.len(), preset.len(), "{name} has duplicate chars");
