@@ -112,6 +112,16 @@ impl BarTrack {
 /// | `Dot`     | `●` | `·`   | Filled / middle dot |
 /// | `Diamond` | `◆` | `◇`   | Filled / open diamond |
 /// | `Square`  | `■` | `□`   | Filled / open square |
+/// | `Star`    | `★` | `☆` | Filled / outline star             |
+/// | `Heart`   | `♥` | `♡` | Filled / outline heart            |
+/// | `Arrow`   | `▶` | `▷` | Solid / outline right triangle    |
+/// | `Circle`  | `◉` | `○` | Fisheye / open circle             |
+/// | `Spark`   | `✦` | `✧` | Black / white four-pointed star   |
+/// | `Cross`    | `✚` | `✛` | Heavy / open-centre cross         |
+/// | `Progress` | `▰` | `▱` | Bold progress-bar segments |
+/// | `Thick`    | `━` | `─` | Heavy / thin horizontal line |
+/// | `Wave`     | `≈` | `˜` | Wave / tilde |
+/// | `Pip`      | `▪` | `·` | Small square / middle dot |
 ///
 /// # Examples
 ///
@@ -139,6 +149,26 @@ pub enum BarStyle {
     Diamond,
     /// Filled / open square — `■` arc, `□` track.
     Square,
+    /// Filled / outline star — `★` arc, `☆` track.
+    Star,
+    /// Filled / outline heart — `♥` arc, `♡` track.
+    Heart,
+    /// Solid / outline right-pointing triangle — `▶` arc, `▷` track.
+    Arrow,
+    /// Fisheye / open circle — `◉` arc, `○` track.
+    Circle,
+    /// Black / white four-pointed star — `✦` arc, `✧` track.
+    Spark,
+    /// Heavy Greek cross / open-centre cross — `✚` arc, `✛` track.
+    Cross,
+    /// Bold progress-bar segments — `▰` arc, `▱` track.
+    Progress,
+    /// Heavy / thin horizontal line — `━` arc, `─` track.
+    Thick,
+    /// Wave / tilde — `≈` arc, `˜` track.
+    Wave,
+    /// Small square / middle dot — `▪` arc, `·` track.
+    Pip,
 }
 
 impl BarStyle {
@@ -152,6 +182,16 @@ impl BarStyle {
             Self::Dot => Some(('●', '·')),
             Self::Diamond => Some(('◆', '◇')),
             Self::Square => Some(('■', '□')),
+            Self::Star => Some(('★', '☆')),
+            Self::Heart => Some(('♥', '♡')),
+            Self::Arrow => Some(('▶', '▷')),
+            Self::Circle => Some(('◉', '○')),
+            Self::Spark => Some(('✦', '✧')),
+            Self::Cross => Some(('✚', '✛')),
+            Self::Progress => Some(('▰', '▱')),
+            Self::Thick => Some(('━', '─')),
+            Self::Wave => Some(('≈', '˜')),
+            Self::Pip => Some(('▪', '·')),
         }
     }
 }
@@ -1117,6 +1157,31 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn all_non_braille_styles_have_char_pairs() {
+        let styles = [
+            BarStyle::Block,
+            BarStyle::Shade,
+            BarStyle::Dot,
+            BarStyle::Diamond,
+            BarStyle::Square,
+            BarStyle::Star,
+            BarStyle::Heart,
+            BarStyle::Arrow,
+            BarStyle::Circle,
+            BarStyle::Spark,
+            BarStyle::Cross,
+            BarStyle::Progress,
+            BarStyle::Thick,
+            BarStyle::Wave,
+            BarStyle::Pip,
+        ];
+        for style in styles {
+            assert!(style.chars().is_some(), "{style:?} should have a char pair");
+        }
+        assert!(BarStyle::Braille.chars().is_none());
     }
 
     #[test]
