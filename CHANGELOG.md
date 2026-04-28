@@ -1,0 +1,33 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+### ♻️ Refactor
+- Refactor Square spinner: simplify, remove Narrow, update styles
+- refactor: rename ZedSpinner -> DotSpinner; add Spin direction
+- refactor: rename DotSpinner -> FluxSpinner; simplify example
+- refactor: clean example — macros, unified Tile, no glyph row, Length(4) cells
+### ✨ Features
+- feat: add RectangularSpinner — Zed/Claude-style bouncing braille arc
+- feat: add ZedSpinner; rename RectangularSpinner → BarSpinner
+- feat: FluxFrames presets + .frames() builder; reorganise example
+- feat: add 5 new FluxFrames presets; rebuild example around preset/direction story
+- feat: replace ARROWS with BOUNCE/HALF/SQUARE/DICE; 4×4 grid with live custom tiles
+- feat: 5×4 compact grid; add BAR/CORNERS presets + SHADE/MUSIC custom tiles
+- feat: split spinner.rs into 3 focused examples; add 5 FluxFrames presets; 4-row grid
+### ➕ Added
+- Add Gitea workflows, scripts, and Nushell test suite
+### 🐛 Bug Fixes
+- fix: resolve all clippy warnings; add gitea/gitea_starscream remotes; update nightly dep workflow
+- fix: redesign RectangularSpinner as solid bouncing bar (true Zed/Claude style)
+- fix: replace row list with 4×3 grid in flux_spinner example
+- fix: vertically centre circle_spinner rows; sync justfile with gitkraft
+- fix: release-* recipes must call (bump version) not bare bump
+### 📚 Documentation
+- docs: add VHS tapes + GIFs for all 5 examples; rewrite README with previews
+### 📦 Other Changes
+- Initial commit
+- square, narrow, circle and linear spinner implementation
+### 🔧 Chores
+- chore: remove stray disktest.txt
