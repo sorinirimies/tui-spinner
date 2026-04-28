@@ -1,9 +1,8 @@
 //! Rectangle braille-arc bouncing spinner.
 //!
-//! A Zed / Claude-style loading bar: every character cell is filled with a
-//! braille glyph; a bright arc window slides left-to-right (and bounces) over
-//! a dimmer background track.  The arc edges taper through a braille density
-//! ramp so the animation looks like a soft glowing comet.
+//! A braille or symbol-based loading bar: every character cell is filled with a
+//! glyph; a bright arc window slides left-to-right (and bounces) over
+//! a dimmer background track.
 //!
 //! Set [`BarSpinner::width`] to `0` (the default) to fill the
 //! available terminal width automatically.
@@ -96,6 +95,67 @@ impl BarTrack {
     }
 }
 
+// ── Symbol style ─────────────────────────────────────────────────────────────
+
+/// Selects the glyph set used for the arc and background track.
+///
+/// [`Braille`](BarStyle::Braille) (the default) uses braille bytes and
+/// supports the full `fade_width` density ramp.  All other variants use a
+/// single Unicode character for the arc and one for the track, with no
+/// intermediate fade.
+///
+/// | Variant   | Arc | Track | Notes |
+/// |-----------|-----|-------|-------|
+/// | `Braille` | `⣿` | `⣀`  | Braille density fade (default) |
+/// | `Block`   | `█` | `░`   | Solid / light block |
+/// | `Shade`   | `▓` | `░`   | Dark shade / light block |
+/// | `Dot`     | `●` | `·`   | Filled / middle dot |
+/// | `Diamond` | `◆` | `◇`   | Filled / open diamond |
+/// | `Square`  | `■` | `□`   | Filled / open square |
+///
+/// # Examples
+///
+/// ```
+/// use tui_spinner::{BarSpinner, BarStyle};
+///
+/// let braille = BarSpinner::new(0);                                    // default
+/// let block   = BarSpinner::new(0).bar_style(BarStyle::Block);
+/// let dot     = BarSpinner::new(0).bar_style(BarStyle::Dot);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BarStyle {
+    /// Dense braille glyphs with a smooth density-gradient fade (default).
+    ///
+    /// Respects `arc_char`, `track`, and `fade_width` settings.
+    #[default]
+    Braille,
+    /// Solid block — `█` arc, `░` track.
+    Block,
+    /// Shade blocks — `▓` arc, `░` track.
+    Shade,
+    /// Filled / middle dot — `●` arc, `·` track.
+    Dot,
+    /// Filled / open diamond — `◆` arc, `◇` track.
+    Diamond,
+    /// Filled / open square — `■` arc, `□` track.
+    Square,
+}
+
+impl BarStyle {
+    /// Returns `Some((arc_char, track_char))` for symbol styles, or `None`
+    /// for [`BarStyle::Braille`] (which uses the existing braille rendering).
+    pub(crate) fn chars(self) -> Option<(char, char)> {
+        match self {
+            Self::Braille => None,
+            Self::Block => Some(('█', '░')),
+            Self::Shade => Some(('▓', '░')),
+            Self::Dot => Some(('●', '·')),
+            Self::Diamond => Some(('◆', '◇')),
+            Self::Square => Some(('■', '□')),
+        }
+    }
+}
+
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 /// Map an edge distance to the appropriate [`FADE`] byte.
@@ -170,7 +230,7 @@ impl RectEngine {
         }
     }
 
-    /// Render the current frame as styled braille [`Line`]s.
+    /// Render the current frame as styled [`Line`]s.
     fn render_lines(
         &self,
         arc_color: Color,
@@ -178,6 +238,7 @@ impl RectEngine {
         fade_width: usize,
         track_byte: u8,
         arc_byte: u8,
+        style_chars: Option<(char, char)>,
     ) -> Vec<Line<'static>> {
         let arc_end = self.anchor + self.arc_cols;
 
@@ -185,13 +246,27 @@ impl RectEngine {
             .map(|_| {
                 let spans: Vec<Span<'static>> = (0..self.char_w)
                     .map(|ci| {
-                        let (byte, color) = if ci >= self.anchor && ci < arc_end {
-                            let from_edge = (ci - self.anchor).min(arc_end - 1 - ci);
-                            (fade_byte(from_edge, fade_width, arc_byte), arc_color)
+                        let (ch, color) = if let Some((arc_ch, track_ch)) = style_chars {
+                            // Symbol style — one char per cell, no braille fade.
+                            if ci >= self.anchor && ci < arc_end {
+                                (arc_ch, arc_color)
+                            } else {
+                                (track_ch, dim_color)
+                            }
                         } else {
-                            (track_byte, dim_color)
+                            // Braille style — density-gradient rendering.
+                            if ci >= self.anchor && ci < arc_end {
+                                let from_edge = (ci - self.anchor).min(arc_end - 1 - ci);
+                                let byte = fade_byte(from_edge, fade_width, arc_byte);
+                                let ch =
+                                    char::from_u32(0x2800 + u32::from(byte)).unwrap_or('\u{2800}');
+                                (ch, arc_color)
+                            } else {
+                                let ch = char::from_u32(0x2800 + u32::from(track_byte))
+                                    .unwrap_or('\u{2800}');
+                                (ch, dim_color)
+                            }
                         };
-                        let ch = char::from_u32(0x2800 + u32::from(byte)).unwrap_or('\u{2800}');
                         Span::styled(ch.to_string(), Style::default().fg(color))
                     })
                     .collect();
@@ -243,6 +318,7 @@ impl RectEngine {
 /// | `track`         | [`BarTrack::Rail`]          |
 /// | `fade_width`    | `3`                         |
 /// | `arc_byte`      | `0xFF` (`⣿`)               |
+/// | `bar_style`     | [`BarStyle::Braille`]       |
 #[derive(Debug, Clone)]
 pub struct BarSpinner<'a> {
     tick: u64,
@@ -266,6 +342,8 @@ pub struct BarSpinner<'a> {
     fade_width: usize,
     /// Braille byte used for the fully-lit arc centre cells (default `0xFF` = `⣿`).
     arc_byte: u8,
+    /// Symbol style for arc and track glyphs (default [`BarStyle::Braille`]).
+    bar_style: BarStyle,
     block: Option<Block<'a>>,
     style: Style,
     alignment: Alignment,
@@ -358,6 +436,7 @@ impl<'a> BarSpinner<'a> {
             track: BarTrack::Rail,
             fade_width: 3,
             arc_byte: 0xFF,
+            bar_style: BarStyle::Braille,
             block: None,
             style: Style::default(),
             alignment: Alignment::Left,
@@ -546,6 +625,27 @@ impl<'a> BarSpinner<'a> {
         self
     }
 
+    /// Sets the glyph style for the arc and background track
+    /// (default [`BarStyle::Braille`]).
+    ///
+    /// Symbol styles (`Block`, `Shade`, `Dot`, `Diamond`, `Square`) use a
+    /// single Unicode character for the arc and one for the track.  They
+    /// ignore `arc_char`, `track`, and `fade_width`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::{BarSpinner, BarStyle};
+    ///
+    /// let block = BarSpinner::new(0).bar_style(BarStyle::Block);
+    /// let dot   = BarSpinner::new(0).bar_style(BarStyle::Dot);
+    /// ```
+    #[must_use]
+    pub fn bar_style(mut self, style: BarStyle) -> Self {
+        self.bar_style = style;
+        self
+    }
+
     /// Wraps the spinner in a [`Block`].
     ///
     /// # Examples
@@ -616,6 +716,7 @@ impl<'a> BarSpinner<'a> {
             self.fade_width,
             self.track.byte(),
             self.arc_byte,
+            self.bar_style.chars(),
         )
     }
 }
@@ -763,7 +864,7 @@ mod tests {
     fn arc_edges_use_fade_bytes() {
         // Build a wide engine so there is a full-density centre.
         let e = RectEngine::build(20, 1, 12, Spin::Clockwise);
-        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF);
+        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF, None);
         assert_eq!(lines.len(), 1);
         let spans = &lines[0].spans;
 
@@ -788,7 +889,7 @@ mod tests {
     #[test]
     fn dim_columns_use_dim_byte() {
         let e = RectEngine::build(20, 1, 6, Spin::Clockwise);
-        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF);
+        let lines = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF, None);
         let spans = &lines[0].spans;
         let dim_char = char::from_u32(0x2800 + u32::from(DIM_BYTE)).unwrap();
         // Columns before the arc anchor should all be DIM_BYTE.
@@ -948,9 +1049,9 @@ mod tests {
     fn arc_char_changes_centre_byte() {
         let e = RectEngine::build(20, 1, 10, Spin::Clockwise);
         // Default arc_byte = 0xFF → centre cell is ⣿
-        let lines_default = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF);
+        let lines_default = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0xFF, None);
         // Custom arc_byte = 0x3F → centre cell is ⠿
-        let lines_custom = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0x3F);
+        let lines_custom = e.render_lines(Color::Cyan, Color::DarkGray, 3, DIM_BYTE, 0x3F, None);
         assert_ne!(
             lines_default, lines_custom,
             "different arc_byte produces different output"
@@ -997,5 +1098,30 @@ mod tests {
                 assert_eq!(ch, '\u{28FF}', "sharp fade + Full track → every cell is ⣿");
             }
         }
+    }
+
+    #[test]
+    fn bar_style_block_produces_non_braille_chars() {
+        let lines = BarSpinner::new(0)
+            .width(20)
+            .bar_style(BarStyle::Block)
+            .build_lines(20);
+        // Every character should be either █ or ░
+        for line in &lines {
+            for span in &line.spans {
+                let ch = span.content.chars().next().unwrap();
+                assert!(
+                    ch == '█' || ch == '░',
+                    "Block style: unexpected char U+{:04X}",
+                    ch as u32
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn bar_style_builder() {
+        let s = BarSpinner::new(0).bar_style(BarStyle::Dot);
+        assert_eq!(s.bar_style, BarStyle::Dot);
     }
 }
