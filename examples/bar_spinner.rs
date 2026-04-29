@@ -155,6 +155,14 @@ const STYLES: &[(BarStyle, &str, Color)] = &[
 // ── Render ────────────────────────────────────────────────────────────────────
 
 fn render_styles(frame: &mut Frame, area: Rect, tick: u64) {
+    // Horizontal margins make each of the 4 columns ~21% wide instead of 25%.
+    let [_l, inner, _r] = Layout::horizontal([
+        Constraint::Percentage(8),
+        Constraint::Percentage(84),
+        Constraint::Percentage(8),
+    ])
+    .areas(area);
+
     // Four rows separated by equal gaps — fills the vertical space evenly.
     let [r1, _g1, r2, _g2, r3, _g3, r4, _rest] = Layout::vertical([
         Constraint::Length(5), // row 1
@@ -166,7 +174,7 @@ fn render_styles(frame: &mut Frame, area: Rect, tick: u64) {
         Constraint::Length(5), // row 4
         Constraint::Min(0),
     ])
-    .areas(area);
+    .areas(inner);
 
     for (row_area, slice) in [
         (r1, &STYLES[0..4]),
