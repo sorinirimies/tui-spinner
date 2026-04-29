@@ -155,35 +155,38 @@ const STYLES: &[(BarStyle, &str, Color)] = &[
 // ── Render ────────────────────────────────────────────────────────────────────
 
 fn render_styles(frame: &mut Frame, area: Rect, tick: u64) {
-    // Two groups of 2 rows (10 rows each) with a 1-row gap.
-    let [g1, _gap, g2, _rest] = Layout::vertical([
-        Constraint::Length(10),
-        Constraint::Length(1),
-        Constraint::Length(10),
+    // Four rows separated by equal gaps — fills the vertical space evenly.
+    let [r1, _g1, r2, _g2, r3, _g3, r4, _rest] = Layout::vertical([
+        Constraint::Length(5), // row 1
+        Constraint::Length(1), // gap
+        Constraint::Length(5), // row 2
+        Constraint::Length(1), // gap
+        Constraint::Length(5), // row 3
+        Constraint::Length(1), // gap
+        Constraint::Length(5), // row 4
         Constraint::Min(0),
     ])
     .areas(area);
 
-    render_group(frame, g1, tick, &STYLES[..8]);
-    render_group(frame, g2, tick, &STYLES[8..]);
+    for (row_area, slice) in [
+        (r1, &STYLES[0..4]),
+        (r2, &STYLES[4..8]),
+        (r3, &STYLES[8..12]),
+        (r4, &STYLES[12..16]),
+    ] {
+        render_group(frame, row_area, tick, slice);
+    }
 }
 
-/// Render up to 8 style entries in a 2-row × 4-col group.
+/// Render one row of up to 4 style entries across 4 equal columns.
 fn render_group(frame: &mut Frame, area: Rect, tick: u64, items: &[(BarStyle, &str, Color)]) {
-    let row_cs: Vec<Constraint> = (0..2)
-        .map(|_| Constraint::Length(5))
-        .chain([Constraint::Min(0)])
-        .collect();
     let col_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
-    let rows = Layout::vertical(row_cs).split(area);
+    let cols = Layout::horizontal(col_cs).split(area);
 
-    for (i, &(style, label, color)) in items.iter().enumerate() {
-        let r = i / 4;
-        let c = i % 4;
-        if r >= rows.len().saturating_sub(1) {
+    for (c, &(style, label, color)) in items.iter().enumerate() {
+        if c >= cols.len() {
             break;
         }
-        let cols = Layout::horizontal(col_cs.clone()).split(rows[r]);
         cell(frame, cols[c], label, color, move |f, inner| {
             trio(f, inner, tick, color, move |t, s, m| {
                 BarSpinner::new(t)
