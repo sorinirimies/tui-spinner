@@ -1,11 +1,11 @@
 [package]
 name = "tui-spinner"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Sorin Albu-Irimies <sorinirimies@gmail.com>"]
 edition = "2021"
 rust-version = "1.74.0"
 license = "MIT"
-description = "Customizable spinner widgets for Ratatui TUI applications — Zed-style dots, ellipsis, and braille arc spinners"
+description = "Customizable animated spinner widgets for Ratatui — braille arcs, bouncing bars, rotating glyphs, and symbol styles"
 repository = "https://github.com/sorinirimies/tui-spinner"
 homepage = "https://github.com/sorinirimies/tui-spinner"
 keywords = ["tui", "terminal", "ratatui", "spinner", "widget"]
