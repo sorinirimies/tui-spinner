@@ -116,7 +116,7 @@ fn render(frame: &mut Frame, app: &App) {
 
     let (subtitle, page_fn): (&str, fn(&mut Frame, Rect, u64)) = match app.page {
         1 => (
-            "↓ Bounce  ·  ↑ Bounce  ·  ⟳ Loop  (Vertical)",
+            "↕ Bounce  ·  ↕ Bounce  ·  ⟳ Loop  (Vertical)",
             render_vertical,
         ),
         _ => (
@@ -213,14 +213,15 @@ fn render_styles(frame: &mut Frame, area: Rect, tick: u64) {
     .areas(area);
 
     // Four rows separated by equal gaps — fills the vertical space evenly.
-    let [r1, _g1, r2, _g2, r3, _g3, r4] = Layout::vertical([
-        Constraint::Fill(1),   // row 1
+    let [r1, _g1, r2, _g2, r3, _g3, r4, _rest] = Layout::vertical([
+        Constraint::Length(5), // row 1
         Constraint::Length(1), // gap
-        Constraint::Fill(1),   // row 2
+        Constraint::Length(5), // row 2
         Constraint::Length(1), // gap
-        Constraint::Fill(1),   // row 3
+        Constraint::Length(5), // row 3
         Constraint::Length(1), // gap
-        Constraint::Fill(1),   // row 4
+        Constraint::Length(5), // row 4
+        Constraint::Min(0),
     ])
     .areas(inner);
 
@@ -263,12 +264,11 @@ fn trio<'a, F>(frame: &mut Frame, inner: Rect, tick: u64, color: Color, make: F)
 where
     F: Fn(u64, Spin, BarMotion) -> BarSpinner<'a>,
 {
-    let [r1, _g1, r2, _g2, r3] = Layout::vertical([
-        Constraint::Fill(1),
+    let [r1, r2, r3, _] = Layout::vertical([
         Constraint::Length(1),
-        Constraint::Fill(1),
         Constraint::Length(1),
-        Constraint::Fill(1),
+        Constraint::Length(1),
+        Constraint::Min(0),
     ])
     .areas(inner);
 
@@ -298,67 +298,59 @@ where
     f(frame, inner);
 }
 
-// ── Page 2: Vertical bars ───────────────────────────────────────────────────────────────
+// ── Page 2: Vertical bars ────────────────────────────────────────────────────
 //
-// Same 4×4 cell grid as horizontal.  Each cell contains three vertical
-// spinners side-by-side: ↓ Bounce, ↑ Bounce, ⟳ Loop — with a hint label
-// at the bottom of each column.
+// Same 16 styles, Vertical orientation.  Each column is a narrow tall spinner;
+// the arc bounces top↕bottom (even indices) or loops continuously (odd).
 
 fn render_vertical(frame: &mut Frame, area: Rect, tick: u64) {
-    // Ratio rows so cells fill the terminal height (unlike Length(5) for horizontal).
-    let row_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
-    let col_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
-    let rows = Layout::vertical(row_cs).split(area);
+    // 16 columns of col_w chars each, centred in the available area.
+    let col_w = 5u16;
+    let n = STYLES.len() as u16;
+    let total_w = col_w * n;
+    let side = area.width.saturating_sub(total_w) / 2;
+
+    let [_l, inner, _r] = Layout::horizontal([
+        Constraint::Length(side),
+        Constraint::Length(total_w),
+        Constraint::Min(0),
+    ])
+    .areas(area);
+
+    let col_cs: Vec<Constraint> = (0..n).map(|_| Constraint::Length(col_w)).collect();
+    let cols = Layout::horizontal(col_cs).split(inner);
 
     for (i, &(style, label, color)) in STYLES.iter().enumerate() {
-        let r = i / 4;
-        let c = i % 4;
-        if r >= rows.len() {
+        if i >= cols.len() {
             break;
         }
-        let cols = Layout::horizontal(col_cs.clone()).split(rows[r]);
-
-        // Bordered cell — same style as horizontal page.
+        let col = cols[i];
+        let title = label
+            .chars()
+            .take((col_w as usize).saturating_sub(2))
+            .collect::<String>();
         let block = Block::bordered()
-            .title(format!(" {label} "))
+            .title(format!(" {} ", title.trim()))
             .title_alignment(Alignment::Center)
             .border_type(BorderType::Rounded)
             .border_style(sty!(color));
-        let inner = block.inner(cols[c]);
-        frame.render_widget(block, cols[c]);
+        let inner_col = block.inner(col);
+        frame.render_widget(block, col);
 
-        // Three equal columns inside the cell: ↓ Bounce | ↑ Bounce | ⟳ Loop.
-        let [c1, c2, c3] = Layout::horizontal([
-            Constraint::Ratio(1, 3),
-            Constraint::Ratio(1, 3),
-            Constraint::Ratio(1, 3),
-        ])
-        .areas(inner);
-
-        for (col_area, spin, motion, hint) in [
-            (c1, Spin::Clockwise, BarMotion::Bounce, "↓"),
-            (c2, Spin::CounterClockwise, BarMotion::Bounce, "↑"),
-            (c3, Spin::Clockwise, BarMotion::Loop, "⟳"),
-        ] {
-            // Spinner fills the area minus a 1-row hint at the bottom.
-            let [bar_area, hint_area] =
-                Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(col_area);
-
-            frame.render_widget(
-                BarSpinner::new(tick)
-                    .orientation(BarOrientation::Vertical)
-                    .bar_style(style)
-                    .arc_color(color)
-                    .dim_color(Color::DarkGray)
-                    .spin(spin)
-                    .motion(motion)
-                    .ticks_per_step(3),
-                bar_area,
-            );
-            frame.render_widget(
-                Paragraph::new(sp!(hint.to_string(); color)).alignment(Alignment::Center),
-                hint_area,
-            );
-        }
+        let motion = if i % 2 == 0 {
+            BarMotion::Bounce
+        } else {
+            BarMotion::Loop
+        };
+        frame.render_widget(
+            BarSpinner::new(tick)
+                .orientation(BarOrientation::Vertical)
+                .bar_style(style)
+                .arc_color(color)
+                .dim_color(Color::DarkGray)
+                .motion(motion)
+                .ticks_per_step(3),
+            inner_col,
+        );
     }
 }

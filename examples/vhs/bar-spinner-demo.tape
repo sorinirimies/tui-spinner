@@ -1,4 +1,4 @@
-# VHS tape for BarSpinner — all 3 pages
+# VHS tape for BarSpinner — horizontal + vertical pages
 # Run: vhs examples/vhs/bar-spinner-demo.tape
 
 Output examples/vhs/generated/bar-spinner-demo.gif
@@ -15,16 +15,12 @@ Enter
 Sleep 12s
 Show
 
-# Page 1: Braille + mixed styles
-Sleep 6s
+# Page 1: Horizontal bars
+Sleep 7s
 
-# Page 2: Symbol styles 4x4
+# Page 2: Vertical bars
 Type "l"
-Sleep 6s
-
-# Page 3: Knobs
-Type "l"
-Sleep 6s
+Sleep 7s
 
 Type "q"
 Sleep 500ms
