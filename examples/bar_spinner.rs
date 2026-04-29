@@ -94,6 +94,17 @@ fn render(frame: &mut Frame, app: &App) {
     ])
     .areas(frame.area());
 
+    // All three zones share the same 8% horizontal margin so everything lines up.
+    let margin = |area: Rect| -> Rect {
+        let [_l, inner, _r] = Layout::horizontal([
+            Constraint::Percentage(8),
+            Constraint::Percentage(84),
+            Constraint::Percentage(8),
+        ])
+        .areas(area);
+        inner
+    };
+
     frame.render_widget(
         Paragraph::new(sp!("→ Bounce  ·  ← Bounce  ·  ⟳ Loop"; dim))
             .alignment(Alignment::Center)
@@ -104,7 +115,7 @@ fn render(frame: &mut Frame, app: &App) {
                     .border_type(BorderType::Rounded)
                     .border_style(sty!(dim)),
             ),
-        header,
+        margin(header),
     );
 
     render_styles(frame, body, app.tick);
@@ -122,7 +133,7 @@ fn render(frame: &mut Frame, app: &App) {
                 .border_type(BorderType::Rounded)
                 .border_style(sty!(dim)),
         ),
-        footer,
+        margin(footer),
     );
 }
 
