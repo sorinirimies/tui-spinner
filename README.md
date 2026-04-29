@@ -24,6 +24,10 @@ Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) T
 
 ## Previews
 
+### All Widgets — Combined Overview
+
+![Spinner Demo](examples/vhs/generated/spinner-demo.gif)
+
 ### SquareSpinner — Filled & Empty · CW ↻ and CCW ↺
 
 ![SquareSpinner Demo](examples/vhs/generated/square-spinner-demo.gif)
@@ -36,17 +40,13 @@ Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) T
 
 ![LinearSpinner Demo](examples/vhs/generated/linear-spinner-demo.gif)
 
-### BarSpinner — Zed / Claude-style bouncing bar
+### BarSpinner — All symbol styles · Bounce & Loop
 
 ![BarSpinner Demo](examples/vhs/generated/bar-spinner-demo.gif)
 
 ### FluxSpinner — All frame presets
 
 ![FluxSpinner Demo](examples/vhs/generated/flux-spinner-demo.gif)
-
-### All Widgets — Combined Overview
-
-![Spinner Demo](examples/vhs/generated/spinner-demo.gif)
 
 ---
 
