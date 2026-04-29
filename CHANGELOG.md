@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## 0.2.2 - 2026-04-29
 ### ♻️ Refactor
 - refactor: shared macros + BarSpinner::with_colors + new edge-case tests
 - refactor: collapse bar_spinner to single page — 16 styles, no duplicates
@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
 ### 🔧 Chores
 - chore(deps): nightly dependency upgrade 2026-04-29
 - chore(deps): update ratatui 0.29 → 0.30; refresh Cargo.lock
+- chore: bump version to 0.2.2
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.2.1...v0.2.2
 ## 0.2.1 - 2026-04-29
 ### ✨ Features
 - feat: BarStyle enum (Block/Shade/Dot/Diamond/Square); example sections

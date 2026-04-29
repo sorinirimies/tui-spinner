@@ -89,15 +89,21 @@ def main [
     }
     print $"($green)  ✓ tests passed($reset)"
 
-    # ── changelog (optional) ─────────────────────────────────────────
+    # ── changelog ──────────────────────────────────────────────────────────────
     let has_cliff = (which git-cliff | length) > 0
     if $has_cliff {
-        print $"($cyan)▸ generating CHANGELOG.md via git-cliff ...($reset)"
-        let cliff_result = (do { git-cliff --output CHANGELOG.md } | complete)
+        # Pass --tag so git-cliff assigns unreleased commits to the new version
+        # rather than leaving them in [Unreleased].  The tag itself is created
+        # in the next step (after the commit), but git-cliff accepts a
+        # not-yet-existing tag as a virtual label for the current HEAD.
+        let tag = $"v($new_version)"
+        print $"($cyan)▸ generating CHANGELOG.md via git-cliff --tag ($tag) ...($reset)"
+        let cliff_result = (do { git-cliff --tag $tag --output CHANGELOG.md } | complete)
         if $cliff_result.exit_code != 0 {
             print $"($yellow)  ⚠ git-cliff failed, skipping changelog($reset)"
         } else {
-            print $"($green)  ✓ CHANGELOG.md updated($reset)"
+            let cl_size = (open --raw CHANGELOG.md | str length)
+            print $"($green)  ✓ CHANGELOG.md updated \(($cl_size) chars\)($reset)"
         }
     } else {
         print $"($yellow)  ⚠ git-cliff not found, skipping changelog($reset)"
