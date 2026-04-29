@@ -17,7 +17,7 @@ Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) T
 | [`SquareSpinner`](#squarespinner) | Square braille ring | Rotating arc | size, spin, centre |
 | [`CircleSpinner`](#circlespinner) | Circular braille ring | Rotating arc | radius, spin, arc_len |
 | [`RectSpinner`](#rectspinner) | Rectangle braille ring | Rotating arc | shape, spin, centre |
-| [`BarSpinner`](#barspinner) | Solid horizontal bar | Bouncing glow (ping-pong) | width, height, arc_width, spin |
+| [`BarSpinner`](#barspinner) | Solid horizontal bar | Bouncing or continuous sweep | bar_style, motion, spin, track, fade_width |
 | [`FluxSpinner`](#fluxspinner) | Single-character glyph | Cycling frame sequence | frames, width, phase_step, spin |
 
 ---
@@ -44,13 +44,17 @@ Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) T
 
 ![FluxSpinner Demo](examples/vhs/generated/flux-spinner-demo.gif)
 
+### All Widgets — Combined Overview
+
+![Spinner Demo](examples/vhs/generated/spinner-demo.gif)
+
 ---
 
 ## Installation
 
 ```toml
 [dependencies]
-tui-spinner = "0.1"
+tui-spinner = "0.2"
 ```
 
 ---
@@ -60,7 +64,7 @@ tui-spinner = "0.1"
 ```rust
 use ratatui::style::Color;
 use tui_spinner::{
-    BarSpinner, Centre, CircleSpinner, Direction, FluxFrames, FluxSpinner,
+    BarMotion, BarSpinner, BarStyle, Centre, CircleSpinner, Direction, FluxFrames, FluxSpinner,
     Flow, LinearSpinner, LinearStyle, RectShape, RectSpinner, Spin, SquareSpinner,
 };
 
@@ -87,6 +91,16 @@ let circle = CircleSpinner::new(tick)
 let bar = BarSpinner::new(tick)
     .arc_color(Color::Cyan)
     .dim_color(Color::DarkGray);
+
+// Continuous sweep (Loop motion) with a Star symbol style
+let sweep = BarSpinner::new(tick)
+    .bar_style(BarStyle::Star)
+    .motion(BarMotion::Loop)
+    .spin(Spin::Clockwise)
+    .arc_color(Color::Yellow);
+
+// Use preset constructors for common configurations
+let preset = BarSpinner::claude(tick);   // 2-row orange bar
 
 // Minimal 1×1 status-bar spinner
 let flux = FluxSpinner::new(tick)
@@ -260,36 +274,75 @@ Braille-dot arc rotating around a configurable rectangle.
 
 ### `BarSpinner`
 
-Zed / Claude-style solid braille bar with a soft glowing arc that bounces
-left and right (ping-pong).  The arc edges taper through a density ramp
-(`⠉ ⠛ ⠿ ⣿`) for a comet-glow look.
+A solid braille or symbol bar with a glowing arc that **bounces** (ping-pong) or **sweeps continuously** (loop).  The arc edges taper through a density ramp for a soft comet-glow look.
 
 Set `width(0)` (the default) to fill the available area automatically.
+
+#### Preset constructors
+
+```rust
+BarSpinner::zed(tick)       // 1 row · cyan   · Rail track
+BarSpinner::claude(tick)    // 2 rows · orange · Rail track
+BarSpinner::minimal(tick)   // 1 row · white  · Empty track (arc floats)
+BarSpinner::solid(tick)     // 1 row · cyan   · Full track · fade=0
+```
+
+#### Builder reference
 
 | Builder | Default | Description |
 |---------|---------|-------------|
 | `width(n)` | `0` (auto-fill) | Fixed column count; `0` = fill area |
-| `height(n)` | `1` | Bar height in rows (1 = thin Zed-style) |
+| `height(n)` | `1` | Bar height in rows |
 | `arc_width(n)` | `0` (auto ⅓) | Bright arc width in character columns |
-| `spin(Spin)` | `Clockwise` | Starting direction before first bounce |
-| `ticks_per_step(n)` | `1` | Ticks per step (higher = slower) |
+| `spin(Spin)` | `Clockwise` | Starting direction |
+| `motion(BarMotion)` | `Bounce` | Edge behaviour: bounce or loop |
+| `bar_style(BarStyle)` | `Braille` | Glyph set for arc and track |
+| `track(BarTrack)` | `Rail` | Background track appearance |
+| `fade_width(n)` | `3` | Gradient ramp width (0 = sharp cutoff) |
+| `arc_char(byte)` | `0xFF` (`⣿`) | Braille byte for arc centre cells |
 | `arc_color(c)` | `Cyan` | Bright arc colour |
 | `dim_color(c)` | `DarkGray` | Background track colour |
+| `with_colors(arc, dim)` | — | Set both colours in one call |
+| `ticks_per_step(n)` | `1` | Ticks per step (higher = slower) |
 | `alignment(a)` | `Left` | Horizontal alignment |
 | `block(b)` | — | Optional `Block` wrapper |
 
-```rust
-// Full-width single-row bar (most common usage)
-let bar = BarSpinner::new(tick)
-    .arc_color(Color::Cyan)
-    .dim_color(Color::DarkGray);
+#### `BarMotion`
 
-// Claude-style warm 2-row banner
-let claude = BarSpinner::new(tick)
-    .height(2)
-    .arc_color(Color::Rgb(255, 165, 0))
-    .dim_color(Color::DarkGray);
-```
+| Variant | Description |
+|---------|-------------|
+| `Bounce` | Reverses at each edge — ping-pong (default) |
+| `Loop` | Wraps around: exits one edge, re-enters from the other |
+
+#### `BarStyle`
+
+| Variant | Arc | Track |
+|---------|-----|-------|
+| `Braille` | `⣿` | `⣀` |
+| `Block` | `█` | `░` |
+| `Shade` | `▓` | `░` |
+| `Dot` | `●` | `·` |
+| `Diamond` | `◆` | `◇` |
+| `Square` | `■` | `□` |
+| `Star` | `★` | `☆` |
+| `Heart` | `♥` | `♡` |
+| `Arrow` | `▶` | `▷` |
+| `Circle` | `◉` | `○` |
+| `Spark` | `✦` | `✧` |
+| `Cross` | `✚` | `✛` |
+| `Progress` | `▰` | `▱` |
+| `Thick` | `━` | `─` |
+| `Wave` | `≈` | `˜` |
+| `Pip` | `▪` | `·` |
+
+#### `BarTrack`
+
+| Variant | Byte | Glyph | Effect |
+|---------|------|-------|--------|
+| `Rail` | `0xC0` | `⣀` | Bottom-two-dot baseline (default) |
+| `Full` | `0xFF` | `⣿` | Full-density track |
+| `Empty` | `0x00` | `⠀` | Invisible — arc floats |
+| `Custom(u8)` | any | — | User-defined braille byte |
 
 ---
 
