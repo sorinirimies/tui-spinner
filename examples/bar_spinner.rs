@@ -2,8 +2,8 @@
 //!
 //! Every style cell shows three bars: → Bounce, ← Bounce, ⟳ Loop.
 //!
-//! Page 1: Mixed styles overview (4×3 compact grid)
-//! Page 2: Symbol Styles (4×4 grid, all 16 variants)
+//! Page 1: Mixed styles overview (4×4, two 2-row groups)
+//! Page 2: Symbol Styles (4×4, two 2-row groups)
 //! Page 3: Knobs (arc width, track, fade, arc char)
 //!
 //! Controls: ← / h  prev  ·  → / l  next  ·  q / Esc  quit
@@ -201,6 +201,77 @@ where
     f(frame, inner);
 }
 
+/// Render up to 8 overview-style entries in a compact 2-row × 4-col group.
+fn render_overview_group(
+    frame: &mut Frame,
+    area: Rect,
+    tick: u64,
+    items: &[(BarStyle, BarTrack, usize, usize, &str, Color)],
+) {
+    let row_cs: Vec<Constraint> = (0..2)
+        .map(|_| Constraint::Length(5))
+        .chain([Constraint::Min(0)])
+        .collect();
+    let col_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
+    let rows = Layout::vertical(row_cs).split(area);
+
+    for (i, &(style, track, height, fade, label, color)) in items.iter().enumerate() {
+        let r = i / 4;
+        let c = i % 4;
+        if r >= rows.len().saturating_sub(1) {
+            break;
+        }
+        let cols = Layout::horizontal(col_cs.clone()).split(rows[r]);
+        cell(frame, cols[c], label, color, move |f, inner| {
+            trio(f, inner, tick, color, move |t, s, m| {
+                BarSpinner::new(t)
+                    .height(height)
+                    .bar_style(style)
+                    .arc_color(color)
+                    .dim_color(Color::DarkGray)
+                    .track(track)
+                    .fade_width(fade)
+                    .spin(s)
+                    .motion(m)
+            });
+        });
+    }
+}
+
+/// Render up to 8 symbol-style entries in a compact 2-row × 4-col group.
+fn render_symbol_group(
+    frame: &mut Frame,
+    area: Rect,
+    tick: u64,
+    items: &[(BarStyle, &str, Color)],
+) {
+    let row_cs: Vec<Constraint> = (0..2)
+        .map(|_| Constraint::Length(5))
+        .chain([Constraint::Min(0)])
+        .collect();
+    let col_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
+    let rows = Layout::vertical(row_cs).split(area);
+
+    for (i, &(style, chars, color)) in items.iter().enumerate() {
+        let r = i / 4;
+        let c = i % 4;
+        if r >= rows.len().saturating_sub(1) {
+            break;
+        }
+        let cols = Layout::horizontal(col_cs.clone()).split(rows[r]);
+        cell(frame, cols[c], chars, color, move |f, inner| {
+            trio(f, inner, tick, color, move |t, s, m| {
+                BarSpinner::new(t)
+                    .bar_style(style)
+                    .arc_color(color)
+                    .dim_color(Color::DarkGray)
+                    .spin(s)
+                    .motion(m)
+            });
+        });
+    }
+}
+
 // ── Page 1: Overview — tight 3×2 mixed grid ────────────────────────────────
 //
 // Six compact cells (Constraint::Length(5) = 2 borders + 3 trio bars).
@@ -274,7 +345,7 @@ const OVERVIEW: &[(BarStyle, BarTrack, usize, usize, &str, Color)] = &[
         "Square   ■□",
         Color::LightRed,
     ),
-    // Row 3 — Symbols / patterns
+    // Row 3 — Symbols / patterns  (group 2, row 1)
     (
         BarStyle::Star,
         BarTrack::Rail,
@@ -307,38 +378,54 @@ const OVERVIEW: &[(BarStyle, BarTrack, usize, usize, &str, Color)] = &[
         "Wave     ≈˜",
         Color::Rgb(120, 200, 220),
     ),
+    // Row 4  (group 2, row 2)
+    (
+        BarStyle::Dot,
+        BarTrack::Rail,
+        1,
+        3,
+        "Dot      ●·",
+        Color::Yellow,
+    ),
+    (
+        BarStyle::Pip,
+        BarTrack::Rail,
+        1,
+        3,
+        "Pip      ▪·",
+        Color::Rgb(180, 180, 255),
+    ),
+    (
+        BarStyle::Arrow,
+        BarTrack::Rail,
+        1,
+        3,
+        "Arrow    ▶▷",
+        Color::Rgb(120, 200, 255),
+    ),
+    (
+        BarStyle::Circle,
+        BarTrack::Rail,
+        1,
+        3,
+        "Circle   ◉○",
+        Color::Rgb(160, 255, 200),
+    ),
 ];
 
 fn page_overview(frame: &mut Frame, area: Rect, tick: u64) {
-    // 4 cols × 3 rows = 12 cells, each exactly 5 rows (2 borders + 3 trio bars).
-    let row_cs: Vec<Constraint> = (0..3)
-        .map(|_| Constraint::Length(5))
-        .chain([Constraint::Min(0)])
-        .collect();
-    let col_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
-    let rows = Layout::vertical(row_cs).split(area);
+    // Two banks of 2 rows (10 rows each) separated by a 1-row gap.
+    // Total: 10 + 1 + 10 = 21 rows, leaving a small margin at the bottom.
+    let [g1, _gap, g2, _rest] = Layout::vertical([
+        Constraint::Length(10),
+        Constraint::Length(1),
+        Constraint::Length(10),
+        Constraint::Min(0),
+    ])
+    .areas(area);
 
-    for (i, &(style, track, height, fade, label, color)) in OVERVIEW.iter().enumerate() {
-        let r = i / 4;
-        let c = i % 4;
-        if r >= rows.len().saturating_sub(1) {
-            break;
-        }
-        let cols = Layout::horizontal(col_cs.clone()).split(rows[r]);
-        cell(frame, cols[c], label, color, move |f, inner| {
-            trio(f, inner, tick, color, move |t, s, m| {
-                BarSpinner::new(t)
-                    .height(height)
-                    .bar_style(style)
-                    .arc_color(color)
-                    .dim_color(Color::DarkGray)
-                    .track(track)
-                    .fade_width(fade)
-                    .spin(s)
-                    .motion(m)
-            });
-        });
-    }
+    render_overview_group(frame, g1, tick, &OVERVIEW[..8]);
+    render_overview_group(frame, g2, tick, &OVERVIEW[8..]);
 }
 
 // ── Page 2: Symbol Styles — 4×4 grid ─────────────────────────────────────────
@@ -363,28 +450,17 @@ const STYLES: &[(BarStyle, &str, Color)] = &[
 ];
 
 fn page_symbols(frame: &mut Frame, area: Rect, tick: u64) {
-    let row_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
-    let col_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
-    let rows = Layout::vertical(row_cs).split(area);
+    // Same 2-bank layout as page_overview.
+    let [g1, _gap, g2, _rest] = Layout::vertical([
+        Constraint::Length(10),
+        Constraint::Length(1),
+        Constraint::Length(10),
+        Constraint::Min(0),
+    ])
+    .areas(area);
 
-    for (i, &(style, chars, color)) in STYLES.iter().enumerate() {
-        let r = i / 4;
-        let c = i % 4;
-        if r >= rows.len() {
-            break;
-        }
-        let cols = Layout::horizontal(col_cs.clone()).split(rows[r]);
-        cell(frame, cols[c], chars, color, move |f, inner| {
-            trio(f, inner, tick, color, move |t, s, m| {
-                BarSpinner::new(t)
-                    .bar_style(style)
-                    .arc_color(color)
-                    .dim_color(Color::DarkGray)
-                    .spin(s)
-                    .motion(m)
-            });
-        });
-    }
+    render_symbol_group(frame, g1, tick, &STYLES[..8]);
+    render_symbol_group(frame, g2, tick, &STYLES[8..]);
 }
 
 // ── Page 3: Knobs — 2×2 grid ─────────────────────────────────────────────────
