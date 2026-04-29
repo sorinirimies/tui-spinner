@@ -85,6 +85,7 @@ clippy:
     cargo clippy --all-features -- -D warnings
 
 # Run all quality checks (format, clippy, test, nu) — must pass before a release.
+
 # Auto-formats first, then verifies no changes remain (catches unstaged format diffs).
 check-all: fmt clippy test test-nu
     @echo "🔍 Verifying formatting is clean…"
@@ -178,6 +179,7 @@ _check-version-changed version: _check-nu
     echo "✅ Version will change: $current → {{ version }}"
 
 # Bump the version, regenerate Cargo.lock + CHANGELOG.md, commit and tag.
+
 # Validation runs first (cheap), quality gate runs second (expensive).
 bump version: (validate-tag version) (_check-version-changed version) check-release _check-git-cliff
     nu scripts/bump_version.nu --yes {{ version }}
@@ -247,10 +249,6 @@ remotes:
 push:
     git push origin main
 
-# Push the current branch to Gitea
-push-gitea:
-    git push gitea main
-
 # Push the current branch to Gitea Starscream
 push-gitea-starscream:
     git push gitea_starscream main
@@ -260,12 +258,11 @@ push-all:
     #!/usr/bin/env sh
     failed=""
     git push origin main             || failed="$failed origin"
-    git push gitea main              || failed="$failed gitea"
     git push gitea_starscream main   || failed="$failed gitea_starscream"
     if [ -n "$failed" ]; then
         echo "⚠️  Failed to push to:$failed"
     else
-        echo "✅ Pushed to GitHub, Gitea, and Gitea Starscream!"
+        echo "✅ Pushed to GitHub and Gitea Starscream!"
     fi
 
 # Force-push the current branch to all remotes
@@ -273,21 +270,16 @@ push-all-force:
     #!/usr/bin/env sh
     failed=""
     git push --force origin main             || failed="$failed origin"
-    git push --force gitea main              || failed="$failed gitea"
     git push --force gitea_starscream main   || failed="$failed gitea_starscream"
     if [ -n "$failed" ]; then
         echo "⚠️  Failed to force-push to:$failed"
     else
-        echo "✅ Force-pushed to GitHub, Gitea, and Gitea Starscream!"
+        echo "✅ Force-pushed to GitHub and Gitea Starscream!"
     fi
 
 # Pull the current branch from GitHub (origin)
 pull:
     git pull origin main
-
-# Pull the current branch from Gitea
-pull-gitea:
-    git pull gitea main
 
 # Pull the current branch from Gitea Starscream
 pull-gitea-starscream:
@@ -298,24 +290,26 @@ pull-all:
     #!/usr/bin/env sh
     failed=""
     git pull origin main             || failed="$failed origin"
-    git pull gitea main              || failed="$failed gitea"
     git pull gitea_starscream main   || failed="$failed gitea_starscream"
     if [ -n "$failed" ]; then
         echo "⚠️  Failed to pull from:$failed"
     else
-        echo "✅ Pulled from GitHub, Gitea, and Gitea Starscream!"
+        echo "✅ Pulled from GitHub and Gitea Starscream!"
     fi
 
 # Push all tags to GitHub
 push-tags:
     git push origin --tags
 
+# Push tags to Gitea Starscream
+push-tags-gitea-starscream:
+    git push gitea_starscream --tags
+
 # Push all tags to all remotes (continues on failure)
 push-tags-all:
     #!/usr/bin/env sh
     failed=""
     git push origin --tags             || failed="$failed origin"
-    git push gitea --tags              || failed="$failed gitea"
     git push gitea_starscream --tags   || failed="$failed gitea_starscream"
     if [ -n "$failed" ]; then
         echo "⚠️  Failed to push tags to:$failed"
@@ -332,12 +326,6 @@ release version: (bump version)
     @echo "✅ Release v{{ version }} pushed — Release workflow will trigger automatically."
     @echo "   https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]//' | sed 's/\.git//')/actions"
 
-# Bump, commit, tag, then push to Gitea only.
-release-gitea version: (bump version)
-    @echo "Pushing release v{{ version }} to Gitea…"
-    git push --follow-tags gitea main
-    @echo "✅ Release v{{ version }} live on Gitea."
-
 # Bump, commit, tag, then push to Gitea Starscream only.
 release-gitea-starscream version: (bump version)
     @echo "Pushing release v{{ version }} to Gitea Starscream…"
@@ -350,12 +338,11 @@ release-all version: (bump version)
     echo "Pushing release v{{ version }} to all remotes…"
     failed=""
     git push --follow-tags origin main             || failed="$failed origin"
-    git push --follow-tags gitea main              || failed="$failed gitea"
     git push --follow-tags gitea_starscream main   || failed="$failed gitea_starscream"
     if [ -n "$failed" ]; then
         echo "⚠️  Release v{{ version }} failed to push to:$failed"
     else
-        echo "✅ Release v{{ version }} pushed to GitHub, Gitea, and Gitea Starscream!"
+        echo "✅ Release v{{ version }} pushed to GitHub and Gitea Starscream!"
     fi
 
 # Push the latest commit and all tags to every remote (no bump, continues on failure).
@@ -363,7 +350,6 @@ push-release-all: check-all
     #!/usr/bin/env sh
     failed=""
     git push --follow-tags origin main             || failed="$failed origin"
-    git push --follow-tags gitea main              || failed="$failed gitea"
     git push --follow-tags gitea_starscream main   || failed="$failed gitea_starscream"
     if [ -n "$failed" ]; then
         echo "⚠️  Failed to push to:$failed"
@@ -380,31 +366,11 @@ release-retrigger version:
     gh workflow run release.yml --field tag=v{{ version }}
     @echo "✅ Dispatched — check progress at: https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions"
 
-# Force-sync Gitea with GitHub
-sync-gitea:
-    git push gitea main --force
-    git push gitea --tags --force
-    @echo "✅ Gitea force-synced with GitHub."
-
 # Force-sync Gitea Starscream with GitHub
 sync-gitea-starscream:
     git push gitea_starscream main --force
     git push gitea_starscream --tags --force
     @echo "✅ Gitea Starscream force-synced with GitHub."
-
-# Force-sync all Gitea instances with GitHub (continues on failure)
-sync-all-gitea:
-    #!/usr/bin/env sh
-    failed=""
-    git push gitea main --force                  || failed="$failed gitea"
-    git push gitea --tags --force                || failed="$failed gitea-tags"
-    git push gitea_starscream main --force       || failed="$failed gitea_starscream"
-    git push gitea_starscream --tags --force     || failed="$failed gitea_starscream-tags"
-    if [ -n "$failed" ]; then
-        echo "⚠️  Failed to sync:$failed"
-    else
-        echo "✅ All Gitea instances force-synced with GitHub."
-    fi
 
 # ── Gitea setup ───────────────────────────────────────────────────────────────
 
