@@ -2,7 +2,7 @@
 //!
 //! Every style cell shows three bars: → Bounce, ← Bounce, ⟳ Loop.
 //!
-//! Page 1: Braille variants (2×2 grid)
+//! Page 1: Mixed styles overview (3×2 compact grid)
 //! Page 2: Symbol Styles (4×4 grid, all 16 variants)
 //! Page 3: Knobs (arc width, track, fade, arc char)
 //!
@@ -46,7 +46,7 @@ macro_rules! sp {
 }
 
 const NUM_PAGES: usize = 3;
-const PAGE_TITLES: [&str; 3] = ["Braille", "Symbol Styles", "Knobs"];
+const PAGE_TITLES: [&str; 3] = ["Overview", "Symbol Styles", "Knobs"];
 
 struct App {
     tick: u64,
@@ -102,7 +102,7 @@ fn render(frame: &mut Frame, app: &App) {
     .areas(frame.area());
     render_header(frame, hdr, app.page);
     match app.page {
-        0 => page_braille(frame, body, app.tick),
+        0 => page_overview(frame, body, app.tick),
         1 => page_symbols(frame, body, app.tick),
         2 => page_knobs(frame, body, app.tick),
         _ => {}
@@ -201,83 +201,93 @@ where
     f(frame, inner);
 }
 
-// ── Page 1: Braille — 2×2 grid ───────────────────────────────────────────────
+// ── Page 1: Overview — tight 3×2 mixed grid ────────────────────────────────
+//
+// Six compact cells (Constraint::Length(5) = 2 borders + 3 trio bars).
+// Mix of Braille and symbol styles so page 1 is immediately representative.
 
-fn page_braille(frame: &mut Frame, area: Rect, tick: u64) {
-    let [top, bot] =
-        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(area);
-    let [tl, tr] =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(top);
-    let [bl, br] =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(bot);
-
-    cell(
-        frame,
-        tl,
-        "Braille · h=1 · Rail · fade=3",
+const OVERVIEW: &[(BarStyle, BarTrack, usize, usize, &str, Color)] = &[
+    // (style, track, height, fade_width, label, color)
+    (
+        BarStyle::Braille,
+        BarTrack::Rail,
+        1,
+        3,
+        "Braille  Rail",
         Color::Cyan,
-        |f, inner| {
-            trio(f, inner, tick, Color::Cyan, |t, s, m| {
-                BarSpinner::new(t)
-                    .height(1)
-                    .arc_color(Color::Cyan)
-                    .dim_color(Color::DarkGray)
-                    .spin(s)
-                    .motion(m)
-            });
-        },
-    );
-    cell(
-        frame,
-        tr,
-        "Braille · h=1 · Full track · fade=0",
+    ),
+    (
+        BarStyle::Braille,
+        BarTrack::Full,
+        1,
+        0,
+        "Braille  Full  fade=0",
         Color::White,
-        |f, inner| {
-            trio(f, inner, tick, Color::White, |t, s, m| {
+    ),
+    (
+        BarStyle::Block,
+        BarTrack::Rail,
+        1,
+        3,
+        "Block    █░",
+        Color::LightGreen,
+    ),
+    (
+        BarStyle::Star,
+        BarTrack::Rail,
+        1,
+        3,
+        "Star     ★☆",
+        Color::Rgb(255, 220, 80),
+    ),
+    (
+        BarStyle::Progress,
+        BarTrack::Rail,
+        1,
+        3,
+        "Progress ▰▱",
+        Color::Rgb(80, 220, 80),
+    ),
+    (
+        BarStyle::Wave,
+        BarTrack::Rail,
+        1,
+        3,
+        "Wave     ≈˜",
+        Color::Rgb(120, 200, 220),
+    ),
+];
+
+fn page_overview(frame: &mut Frame, area: Rect, tick: u64) {
+    // Fixed 5-row cells: 2 borders + 3 trio bars — no wasted space.
+    let row_cs: Vec<Constraint> = (0..2)
+        .map(|_| Constraint::Length(5))
+        .chain([Constraint::Min(0)])
+        .collect();
+    let col_cs: Vec<Constraint> = (0..3).map(|_| Constraint::Ratio(1, 3)).collect();
+    let rows = Layout::vertical(row_cs).split(area);
+
+    for (i, &(style, track, height, fade, label, color)) in OVERVIEW.iter().enumerate() {
+        let r = i / 3;
+        let c = i % 3;
+        if r >= rows.len().saturating_sub(1) {
+            break;
+        }
+        let cols = Layout::horizontal(col_cs.clone()).split(rows[r]);
+        cell(frame, cols[c], label, color, move |f, inner| {
+            trio(f, inner, tick, color, move |t, s, m| {
                 BarSpinner::new(t)
-                    .height(1)
-                    .arc_color(Color::White)
+                    .height(height)
+                    .bar_style(style)
+                    .arc_color(color)
                     .dim_color(Color::DarkGray)
-                    .track(BarTrack::Full)
-                    .fade_width(0)
+                    .track(track)
+                    .fade_width(fade)
                     .spin(s)
                     .motion(m)
             });
-        },
-    );
-    cell(
-        frame,
-        bl,
-        "Braille · h=2 · Rail",
-        Color::LightBlue,
-        |f, inner| {
-            trio(f, inner, tick, Color::LightBlue, |t, s, m| {
-                BarSpinner::new(t)
-                    .height(2)
-                    .arc_color(Color::LightBlue)
-                    .dim_color(Color::DarkGray)
-                    .spin(s)
-                    .motion(m)
-            });
-        },
-    );
-    cell(
-        frame,
-        br,
-        "Braille · h=1 · Empty track",
-        Color::LightMagenta,
-        |f, inner| {
-            trio(f, inner, tick, Color::LightMagenta, |t, s, m| {
-                BarSpinner::new(t)
-                    .height(1)
-                    .arc_color(Color::LightMagenta)
-                    .dim_color(Color::Black)
-                    .track(BarTrack::Empty)
-                    .spin(s)
-                    .motion(m)
-            });
-        },
-    );
+        });
+    }
 }
 
 // ── Page 2: Symbol Styles — 4×4 grid ─────────────────────────────────────────
