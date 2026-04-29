@@ -49,9 +49,9 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Style, Styled};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Widget};
+use ratatui::widgets::{Block, Widget};
 
 use crate::Spin;
 
@@ -519,47 +519,13 @@ impl<'a> FluxSpinner<'a> {
 
 // ── Trait impls ───────────────────────────────────────────────────────────────
 
-impl Styled for FluxSpinner<'_> {
-    type Item = Self;
+impl_styled_for!(FluxSpinner<'_>);
 
-    fn style(&self) -> Style {
-        self.style
-    }
-
-    fn set_style<S: Into<Style>>(mut self, style: S) -> Self {
-        self.style = style.into();
-        self
-    }
-}
-
-impl Widget for FluxSpinner<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        Widget::render(&self, area, buf);
-    }
-}
+impl_widget_via_ref!(FluxSpinner<'_>);
 
 impl Widget for &FluxSpinner<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.area() == 0 {
-            return;
-        }
-
-        buf.set_style(area, self.style);
-
-        let inner_area = self.block.as_ref().map_or(area, |b| {
-            let inner = b.inner(area);
-            Widget::render(b.clone(), area, buf);
-            inner
-        });
-
-        if inner_area.area() == 0 {
-            return;
-        }
-
-        let lines = self.build_lines();
-        Paragraph::new(lines)
-            .alignment(self.alignment)
-            .render(inner_area, buf);
+        render_spinner_body!(self, area, buf, self.build_lines());
     }
 }
 

@@ -27,7 +27,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Style, Styled};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Widget};
 
@@ -688,6 +688,25 @@ impl<'a> BarSpinner<'a> {
         self
     }
 
+    /// Sets both `arc_color` and `dim_color` in one call.
+    ///
+    /// Equivalent to `.arc_color(arc).dim_color(dim)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ratatui::style::Color;
+    /// use tui_spinner::BarSpinner;
+    ///
+    /// let s = BarSpinner::new(0).with_colors(Color::Cyan, Color::DarkGray);
+    /// ```
+    #[must_use]
+    pub fn with_colors(mut self, arc_color: Color, dim_color: Color) -> Self {
+        self.arc_color = arc_color;
+        self.dim_color = dim_color;
+        self
+    }
+
     /// Sets the background track style (default [`BarTrack::Rail`]).
     ///
     /// # Examples
@@ -867,24 +886,9 @@ impl<'a> BarSpinner<'a> {
 
 // ── Trait impls ───────────────────────────────────────────────────────────────
 
-impl Styled for BarSpinner<'_> {
-    type Item = Self;
+impl_styled_for!(BarSpinner<'_>);
 
-    fn style(&self) -> Style {
-        self.style
-    }
-
-    fn set_style<S: Into<Style>>(mut self, style: S) -> Self {
-        self.style = style.into();
-        self
-    }
-}
-
-impl Widget for BarSpinner<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        Widget::render(&self, area, buf);
-    }
-}
+impl_widget_via_ref!(BarSpinner<'_>);
 
 impl Widget for &BarSpinner<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -1241,6 +1245,83 @@ mod tests {
                 let ch = span.content.chars().next().unwrap();
                 assert_eq!(ch, '\u{28FF}', "sharp fade + Full track → every cell is ⣿");
             }
+        }
+    }
+
+    // ── with_colors convenience ────────────────────────────────────────────────
+
+    #[test]
+    fn with_colors_sets_both() {
+        use ratatui::style::Color;
+        let s = BarSpinner::new(0).with_colors(Color::Red, Color::Blue);
+        assert_eq!(s.arc_color, Color::Red);
+        assert_eq!(s.dim_color, Color::Blue);
+    }
+
+    // ── Arc width clamping ────────────────────────────────────────────────────
+
+    #[test]
+    fn arc_width_larger_than_bar_is_clamped() {
+        // arc_width > char_w should be clamped to char_w - 1 inside the engine.
+        let e = RectEngine::build(10, 1, 99, Spin::Clockwise, BarMotion::Bounce);
+        assert!(e.arc_cols < e.char_w, "arc_cols must be < char_w");
+    }
+
+    #[test]
+    fn arc_width_zero_uses_auto() {
+        let e = RectEngine::build(30, 1, 0, Spin::Clockwise, BarMotion::Bounce);
+        assert!(e.arc_cols >= 4, "auto arc should be at least 4 cols");
+        assert!(e.arc_cols < e.char_w);
+    }
+
+    // ── Loop wraps correctly across the full range ────────────────────────────
+
+    #[test]
+    fn loop_all_columns_lit_over_full_cycle() {
+        let width = 12usize;
+        let arc_cols = 4usize;
+        let mut e = RectEngine::build(width, 1, arc_cols, Spin::Clockwise, BarMotion::Loop);
+        let mut ever_lit = vec![false; width];
+
+        // Walk one full cycle (char_w steps) and record which columns are lit.
+        for _ in 0..width {
+            let lines = e.render_lines(
+                ratatui::style::Color::Cyan,
+                ratatui::style::Color::DarkGray,
+                3,
+                DIM_BYTE,
+                0xFF,
+                None,
+            );
+            for (ci, span) in lines[0].spans.iter().enumerate() {
+                if span.style.fg == Some(ratatui::style::Color::Cyan) {
+                    ever_lit[ci] = true;
+                }
+            }
+            e.walk();
+        }
+
+        // Every column should have been lit at least once.
+        for (ci, &lit) in ever_lit.iter().enumerate() {
+            assert!(lit, "column {ci} was never lit during a full Loop cycle");
+        }
+    }
+
+    // ── BarStyle produces expected characters ─────────────────────────────────
+
+    #[test]
+    fn non_braille_style_chars_match_declaration() {
+        for (style, expected_arc, expected_track) in [
+            (BarStyle::Block, '\u{2588}', '\u{2591}'),
+            (BarStyle::Dot, '\u{25CF}', '\u{00B7}'),
+            (BarStyle::Star, '\u{2605}', '\u{2606}'),
+            (BarStyle::Progress, '\u{25B0}', '\u{25B1}'),
+        ] {
+            let Some((arc, track)) = style.chars() else {
+                panic!("{style:?} should have char pair");
+            };
+            assert_eq!(arc, expected_arc, "{style:?} arc char mismatch");
+            assert_eq!(track, expected_track, "{style:?} track char mismatch");
         }
     }
 

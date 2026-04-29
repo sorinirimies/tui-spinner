@@ -32,9 +32,9 @@ use crate::rect_spinner::Spin;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Style, Styled};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Widget};
+use ratatui::widgets::{Block, Widget};
 
 // ── Braille constants ─────────────────────────────────────────────────────────
 
@@ -528,43 +528,13 @@ impl<'a> CircleSpinner<'a> {
     }
 }
 
-impl Styled for CircleSpinner<'_> {
-    type Item = Self;
+impl_styled_for!(CircleSpinner<'_>);
 
-    fn style(&self) -> Style {
-        self.style
-    }
-
-    fn set_style<S: Into<Style>>(mut self, style: S) -> Self {
-        self.style = style.into();
-        self
-    }
-}
-
-impl Widget for CircleSpinner<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        Widget::render(&self, area, buf);
-    }
-}
+impl_widget_via_ref!(CircleSpinner<'_>);
 
 impl Widget for &CircleSpinner<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        buf.set_style(area, self.style);
-        let inner = match &self.block {
-            Some(b) => {
-                let ia = b.inner(area);
-                b.clone().render(area, buf);
-                ia
-            }
-            None => area,
-        };
-        if inner.width == 0 || inner.height == 0 {
-            return;
-        }
-        let lines = self.build_lines();
-        Paragraph::new(lines)
-            .alignment(self.alignment)
-            .render(inner, buf);
+        render_spinner_body!(self, area, buf, self.build_lines());
     }
 }
 

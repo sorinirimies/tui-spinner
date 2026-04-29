@@ -92,6 +92,9 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 
+#[macro_use]
+mod macros;
+
 mod bar_spinner;
 mod circle_spinner;
 mod flux_spinner;

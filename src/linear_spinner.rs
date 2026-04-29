@@ -14,7 +14,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style, Styled};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Widget};
 
@@ -545,26 +545,11 @@ impl<'a> LinearSpinner<'a> {
 
 // ── Styled ────────────────────────────────────────────────────────────────────
 
-impl Styled for LinearSpinner<'_> {
-    type Item = Self;
-
-    fn style(&self) -> Style {
-        self.style
-    }
-
-    fn set_style<S: Into<Style>>(mut self, style: S) -> Self::Item {
-        self.style = style.into();
-        self
-    }
-}
+impl_styled_for!(LinearSpinner<'_>);
 
 // ── Widget ────────────────────────────────────────────────────────────────────
 
-impl Widget for LinearSpinner<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        Widget::render(&self, area, buf);
-    }
-}
+impl_widget_via_ref!(LinearSpinner<'_>);
 
 impl Widget for &LinearSpinner<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
