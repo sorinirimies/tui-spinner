@@ -374,7 +374,7 @@ fn render_circle_column(frame: &mut Frame, area: Rect, tick: u64) {
     // Build row heights from the actual char_size of each spinner.
     let row_heights: Vec<u16> = configs
         .iter()
-        .map(|&(r, .., _)| CircleSpinner::new(0).radius(r).char_size().1.max(1))
+        .map(|&(r, ..)| CircleSpinner::new(0).radius(r).char_size().1.max(1))
         .collect();
 
     let total_h: u16 = row_heights.iter().sum();

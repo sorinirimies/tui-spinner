@@ -63,7 +63,7 @@ impl Default for App {
     }
 }
 
-fn main() -> color_eyre::Result<()> {
+fn main() -> Result<()> {
     color_eyre::install()?;
     let terminal = ratatui::init();
     let result = run(terminal, &mut App::default());
@@ -71,7 +71,7 @@ fn main() -> color_eyre::Result<()> {
     result
 }
 
-fn run(mut terminal: DefaultTerminal, app: &mut App) -> color_eyre::Result<()> {
+fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
     loop {
         let steps = (Instant::now().duration_since(app.last_tick).as_millis() / 80).max(1) as u64;
         app.last_tick = Instant::now();

@@ -27,7 +27,6 @@ use std::time::{Duration, Instant};
 use tui_spinner::{Centre, Spin, SquareSpinner};
 
 // ── macros ────────────────────────────────────────────────────────────────────
-// (sty!, sp!, section_block! — defined inline so the example is self-contained)
 macro_rules! sty {
     (dim) => {
         Style::default().fg(Color::DarkGray)
@@ -48,16 +47,6 @@ macro_rules! sp {
     };
     ($t:expr; $c:expr, b) => {
         Span::styled($t, sty!($c, b))
-    };
-}
-macro_rules! section_block {
-    ($title:expr, $color:expr) => {
-        Block::bordered()
-            .title(concat!(" ", $title, " "))
-            .title_alignment(Alignment::Center)
-            .border_type(BorderType::Rounded)
-            .border_style(sty!($color))
-            .padding(Padding::uniform(1))
     };
 }
 
