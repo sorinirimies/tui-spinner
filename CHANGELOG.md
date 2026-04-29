@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.3 - 2026-04-29
+### 🐛 Bug Fixes
+- fix: bump_version.nu passes --tag to git-cliff so commits land under the release version
+### 📚 Documentation
+- docs: add crates.io downloads badge to README
+- docs: move combined overview GIF to first preview; fix BarSpinner heading
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.2.2...v0.2.3
 ## 0.2.2 - 2026-04-29
 ### ♻️ Refactor
 - refactor: shared macros + BarSpinner::with_colors + new edge-case tests
