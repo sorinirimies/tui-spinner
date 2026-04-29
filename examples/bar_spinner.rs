@@ -1,11 +1,10 @@
 //! # BarSpinner Example
 //!
-//! Every style cell shows three bars: → Bounce, ← Bounce, ⟳ Loop.
+//! **Page 1** — Horizontal: all 16 [`BarStyle`] variants with → Bounce, ← Bounce, ⟳ Loop.
 //!
-//! All 16 [`BarStyle`] variants are displayed in a 4×4 grid split into two
-//! 2-row groups so the layout fills the terminal cleanly.
+//! **Page 2** — Vertical: same 16 styles, arc bounces top ↕ bottom.
 //!
-//! **Controls:** `q` / `Esc` quit
+//! **Controls:** `←`/`h` prev · `→`/`l` next · `q`/`Esc` quit
 //!
 //! Run with: `cargo run --example bar_spinner`
 
@@ -19,7 +18,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
-use tui_spinner::{BarMotion, BarSpinner, BarStyle, Spin};
+use tui_spinner::{BarMotion, BarOrientation, BarSpinner, BarStyle, Spin};
 
 macro_rules! sty {
     (dim) => {
@@ -46,15 +45,19 @@ macro_rules! sp {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
+const NUM_PAGES: usize = 2;
+
 struct App {
     tick: u64,
     last_tick: Instant,
+    page: usize,
 }
 impl Default for App {
     fn default() -> Self {
         Self {
             tick: 0,
             last_tick: Instant::now(),
+            page: 0,
         }
     }
 }
@@ -75,8 +78,15 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
         terminal.draw(|f| render(f, app))?;
         if event::poll(Duration::from_millis(16))? {
             if let Event::Key(k) = event::read()? {
-                if matches!(k.code, KeyCode::Char('q') | KeyCode::Esc) {
-                    break;
+                match k.code {
+                    KeyCode::Char('q') | KeyCode::Esc => break,
+                    KeyCode::Left | KeyCode::Char('h') => {
+                        app.page = app.page.saturating_sub(1);
+                    }
+                    KeyCode::Right | KeyCode::Char('l') => {
+                        app.page = (app.page + 1).min(NUM_PAGES - 1);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -94,7 +104,6 @@ fn render(frame: &mut Frame, app: &App) {
     ])
     .areas(frame.area());
 
-    // All three zones share the same 8% horizontal margin so everything lines up.
     let margin = |area: Rect| -> Rect {
         let [_l, inner, _r] = Layout::horizontal([
             Constraint::Percentage(8),
@@ -105,27 +114,56 @@ fn render(frame: &mut Frame, app: &App) {
         inner
     };
 
-    frame.render_widget(
-        Paragraph::new(sp!("→ Bounce  ·  ← Bounce  ·  ⟳ Loop"; dim))
-            .alignment(Alignment::Center)
-            .block(
-                Block::bordered()
-                    .title(" BarSpinner ")
-                    .title_alignment(Alignment::Center)
-                    .border_type(BorderType::Rounded)
-                    .border_style(sty!(dim)),
-            ),
-        margin(header),
-    );
+    let (subtitle, page_fn): (&str, fn(&mut Frame, Rect, u64)) = match app.page {
+        1 => (
+            "↕ Bounce  ·  ↕ Bounce  ·  ⟳ Loop  (Vertical)",
+            render_vertical,
+        ),
+        _ => (
+            "→ Bounce  ·  ← Bounce  ·  ⟳ Loop  (Horizontal)",
+            render_styles,
+        ),
+    };
 
-    render_styles(frame, body, app.tick);
+    let prev = if app.page > 0 {
+        "← / h  prev"
+    } else {
+        "            "
+    };
+    let next = if app.page + 1 < NUM_PAGES {
+        "next  → / l"
+    } else {
+        "            "
+    };
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
+            sp!(format!("{}/{} · ", app.page + 1, NUM_PAGES); dim),
+            sp!(subtitle; dim),
+        ]))
+        .alignment(Alignment::Center)
+        .block(
+            Block::bordered()
+                .title(" BarSpinner ")
+                .title_alignment(Alignment::Center)
+                .border_type(BorderType::Rounded)
+                .border_style(sty!(dim)),
+        ),
+        margin(header),
+    );
+
+    page_fn(frame, margin(body), app.tick);
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            sp!(prev; Color::Cyan),
+            sp!("  "; dim),
             sp!("q"; Color::Cyan, b),
             sp!(" / "; dim),
             sp!("Esc"; Color::Cyan, b),
             sp!("  quit"; dim),
+            sp!("  "; dim),
+            sp!(next; Color::Cyan),
         ]))
         .alignment(Alignment::Center)
         .block(
@@ -258,4 +296,61 @@ where
     let inner = block.inner(area);
     frame.render_widget(block, area);
     f(frame, inner);
+}
+
+// ── Page 2: Vertical bars ────────────────────────────────────────────────────
+//
+// Same 16 styles, Vertical orientation.  Each column is a narrow tall spinner;
+// the arc bounces top↕bottom (even indices) or loops continuously (odd).
+
+fn render_vertical(frame: &mut Frame, area: Rect, tick: u64) {
+    // 16 columns of col_w chars each, centred in the available area.
+    let col_w = 5u16;
+    let n = STYLES.len() as u16;
+    let total_w = col_w * n;
+    let side = area.width.saturating_sub(total_w) / 2;
+
+    let [_l, inner, _r] = Layout::horizontal([
+        Constraint::Length(side),
+        Constraint::Length(total_w),
+        Constraint::Min(0),
+    ])
+    .areas(area);
+
+    let col_cs: Vec<Constraint> = (0..n).map(|_| Constraint::Length(col_w)).collect();
+    let cols = Layout::horizontal(col_cs).split(inner);
+
+    for (i, &(style, label, color)) in STYLES.iter().enumerate() {
+        if i >= cols.len() {
+            break;
+        }
+        let col = cols[i];
+        let title = label
+            .chars()
+            .take((col_w as usize).saturating_sub(2))
+            .collect::<String>();
+        let block = Block::bordered()
+            .title(format!(" {} ", title.trim()))
+            .title_alignment(Alignment::Center)
+            .border_type(BorderType::Rounded)
+            .border_style(sty!(color));
+        let inner_col = block.inner(col);
+        frame.render_widget(block, col);
+
+        let motion = if i % 2 == 0 {
+            BarMotion::Bounce
+        } else {
+            BarMotion::Loop
+        };
+        frame.render_widget(
+            BarSpinner::new(tick)
+                .orientation(BarOrientation::Vertical)
+                .bar_style(style)
+                .arc_color(color)
+                .dim_color(Color::DarkGray)
+                .motion(motion)
+                .ticks_per_step(3),
+            inner_col,
+        );
+    }
 }

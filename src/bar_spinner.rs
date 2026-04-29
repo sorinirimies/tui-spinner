@@ -229,6 +229,32 @@ pub enum BarMotion {
     Loop,
 }
 
+// ── Orientation ───────────────────────────────────────────────────────────────
+
+/// Controls whether the bar slides horizontally or vertically.
+///
+/// | Variant      | Arc motion        |
+/// |--------------|-------------------|
+/// | `Horizontal` | left ↔ right (default) |
+/// | `Vertical`   | top ↕ bottom      |
+///
+/// # Examples
+///
+/// ```
+/// use tui_spinner::{BarSpinner, BarOrientation};
+///
+/// let h = BarSpinner::new(0).orientation(BarOrientation::Horizontal);
+/// let v = BarSpinner::new(0).orientation(BarOrientation::Vertical);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BarOrientation {
+    /// Arc bounces / loops left ↔ right (default).
+    #[default]
+    Horizontal,
+    /// Arc bounces / loops top ↕ bottom.
+    Vertical,
+}
+
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 /// Map an edge distance to the appropriate [`FADE`] byte.
@@ -395,6 +421,125 @@ impl RectEngine {
     }
 }
 
+// ── Vertical engine ───────────────────────────────────────────────────────────
+
+/// Internal engine for vertical [`BarSpinner`] orientation.
+///
+/// Mirrors [`RectEngine`] but animates in the row dimension instead of columns.
+struct VertRectEngine {
+    char_w: usize,
+    char_h: usize,
+    arc_rows: usize,
+    anchor: usize,
+    going_forward: bool,
+    motion: BarMotion,
+}
+
+impl VertRectEngine {
+    fn build(
+        char_w: usize,
+        char_h: usize,
+        arc_height: usize,
+        spin: Spin,
+        motion: BarMotion,
+    ) -> Self {
+        let char_w = char_w.max(1);
+        let char_h = char_h.max(3);
+
+        let arc_rows = if arc_height > 0 {
+            arc_height.min(char_h.saturating_sub(1))
+        } else {
+            char_h.div_ceil(3).max(2)
+        };
+
+        let going_forward = matches!(spin, Spin::Clockwise);
+        let anchor = if going_forward {
+            0
+        } else {
+            char_h.saturating_sub(arc_rows)
+        };
+
+        Self {
+            char_w,
+            char_h,
+            arc_rows,
+            anchor,
+            going_forward,
+            motion,
+        }
+    }
+
+    fn walk(&mut self) {
+        match self.motion {
+            BarMotion::Bounce => {
+                let max_anchor = self.char_h.saturating_sub(self.arc_rows);
+                if self.going_forward {
+                    if self.anchor < max_anchor {
+                        self.anchor += 1;
+                    } else {
+                        self.going_forward = false;
+                    }
+                } else if self.anchor > 0 {
+                    self.anchor -= 1;
+                } else {
+                    self.going_forward = true;
+                }
+            }
+            BarMotion::Loop => {
+                if self.going_forward {
+                    self.anchor = (self.anchor + 1) % self.char_h;
+                } else {
+                    self.anchor = (self.anchor + self.char_h - 1) % self.char_h;
+                }
+            }
+        }
+    }
+
+    fn render_lines(
+        &self,
+        arc_color: Color,
+        dim_color: Color,
+        track_byte: u8,
+        arc_byte: u8,
+        style_chars: Option<(char, char)>,
+    ) -> Vec<Line<'static>> {
+        let char_h = self.char_h;
+        let arc_rows = self.arc_rows;
+
+        (0..char_h)
+            .map(|row| {
+                let in_arc = match self.motion {
+                    BarMotion::Bounce => row >= self.anchor && row < self.anchor + arc_rows,
+                    BarMotion::Loop => (row + char_h - self.anchor) % char_h < arc_rows,
+                };
+
+                let (ch, color) = if let Some((arc_ch, track_ch)) = style_chars {
+                    if in_arc {
+                        (arc_ch, arc_color)
+                    } else {
+                        (track_ch, dim_color)
+                    }
+                } else if in_arc {
+                    (
+                        char::from_u32(0x2800 + u32::from(arc_byte)).unwrap_or('\u{2800}'),
+                        arc_color,
+                    )
+                } else {
+                    (
+                        char::from_u32(0x2800 + u32::from(track_byte)).unwrap_or('\u{2800}'),
+                        dim_color,
+                    )
+                };
+
+                let spans: Vec<Span<'static>> = (0..self.char_w)
+                    .map(|_| Span::styled(ch.to_string(), Style::default().fg(color)))
+                    .collect();
+                Line::from(spans)
+            })
+            .collect()
+    }
+}
+
 // ── Public widget ─────────────────────────────────────────────────────────────
 
 /// A Zed / Claude-style braille loading bar that **bounces** left and right.
@@ -466,6 +611,8 @@ pub struct BarSpinner<'a> {
     bar_style: BarStyle,
     /// Arc motion mode (default [`BarMotion::Bounce`]).
     motion: BarMotion,
+    /// Bar orientation: horizontal (default) or vertical.
+    orientation: BarOrientation,
     block: Option<Block<'a>>,
     style: Style,
     alignment: Alignment,
@@ -560,6 +707,7 @@ impl<'a> BarSpinner<'a> {
             arc_byte: 0xFF,
             bar_style: BarStyle::Braille,
             motion: BarMotion::Bounce,
+            orientation: BarOrientation::Horizontal,
             block: None,
             style: Style::default(),
             alignment: Alignment::Left,
@@ -809,6 +957,30 @@ impl<'a> BarSpinner<'a> {
         self
     }
 
+    /// Sets the bar orientation (default [`BarOrientation::Horizontal`]).
+    ///
+    /// - [`BarOrientation::Horizontal`] — arc slides left ↔ right (default).
+    /// - [`BarOrientation::Vertical`]   — arc slides top ↕ bottom.
+    ///
+    /// For vertical bars, `width` controls the number of character columns
+    /// and `height` (or the available area height) controls the bar length.
+    /// `arc_width` controls the height of the bright arc in rows.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::{BarSpinner, BarOrientation};
+    ///
+    /// let v = BarSpinner::new(0)
+    ///     .orientation(BarOrientation::Vertical)
+    ///     .width(3);
+    /// ```
+    #[must_use]
+    pub fn orientation(mut self, orientation: BarOrientation) -> Self {
+        self.orientation = orientation;
+        self
+    }
+
     /// Wraps the spinner in a [`Block`].
     ///
     /// # Examples
@@ -863,24 +1035,51 @@ impl<'a> BarSpinner<'a> {
         }
     }
 
-    fn build_lines(&self, actual_width: usize) -> Vec<Line<'static>> {
-        let w = actual_width.max(3);
-        let mut engine = RectEngine::build(w, self.height, self.arc_width, self.spin, self.motion);
-
+    fn build_lines(&self, actual_width: usize, actual_height: usize) -> Vec<Line<'static>> {
         #[allow(clippy::cast_possible_truncation)]
         let steps = (self.tick / self.ticks_per_step) as usize;
-        for _ in 0..steps {
-            engine.walk();
-        }
 
-        engine.render_lines(
-            self.arc_color,
-            self.dim_color,
-            self.fade_width,
-            self.track.byte(),
-            self.arc_byte,
-            self.bar_style.chars(),
-        )
+        match self.orientation {
+            BarOrientation::Horizontal => {
+                let w = actual_width.max(3);
+                let mut engine =
+                    RectEngine::build(w, self.height, self.arc_width, self.spin, self.motion);
+                for _ in 0..steps {
+                    engine.walk();
+                }
+                engine.render_lines(
+                    self.arc_color,
+                    self.dim_color,
+                    self.fade_width,
+                    self.track.byte(),
+                    self.arc_byte,
+                    self.bar_style.chars(),
+                )
+            }
+            BarOrientation::Vertical => {
+                // For vertical bars the width field controls the column count
+                // and the available area height drives the bar length.
+                let char_w = if self.width == 0 {
+                    actual_width
+                } else {
+                    self.width
+                }
+                .max(1);
+                let char_h = actual_height.max(3);
+                let mut engine =
+                    VertRectEngine::build(char_w, char_h, self.arc_width, self.spin, self.motion);
+                for _ in 0..steps {
+                    engine.walk();
+                }
+                engine.render_lines(
+                    self.arc_color,
+                    self.dim_color,
+                    self.track.byte(),
+                    self.arc_byte,
+                    self.bar_style.chars(),
+                )
+            }
+        }
     }
 }
 
@@ -908,14 +1107,16 @@ impl Widget for &BarSpinner<'_> {
             return;
         }
 
-        // Resolve width: explicit fixed value, or fill available area.
+        // Horizontal: width drives bar length; height is row thickness.
+        // Vertical:   height drives bar length; width is column thickness.
         let actual_width = if self.width == 0 {
             inner_area.width as usize
         } else {
             self.width
         };
+        let actual_height = inner_area.height as usize;
 
-        let lines = self.build_lines(actual_width);
+        let lines = self.build_lines(actual_width, actual_height);
         Paragraph::new(lines)
             .alignment(self.alignment)
             .render(inner_area, buf);
@@ -1055,7 +1256,7 @@ mod tests {
     #[test]
     fn build_lines_height_matches() {
         for h in 1..=5usize {
-            let lines = BarSpinner::new(0).width(20).height(h).build_lines(20);
+            let lines = BarSpinner::new(0).width(20).height(h).build_lines(20, 10);
             assert_eq!(lines.len(), h, "height={h}");
         }
     }
@@ -1063,14 +1264,14 @@ mod tests {
     #[test]
     fn build_lines_width_matches() {
         let w = 24usize;
-        let lines = BarSpinner::new(0).width(w).height(1).build_lines(w);
+        let lines = BarSpinner::new(0).width(w).height(1).build_lines(w, 10);
         assert_eq!(lines[0].spans.len(), w, "each line should have {w} spans");
     }
 
     #[test]
     fn different_ticks_produce_different_output() {
-        let a = BarSpinner::new(0).width(20).height(1).build_lines(20);
-        let b = BarSpinner::new(8).width(20).height(1).build_lines(20);
+        let a = BarSpinner::new(0).width(20).height(1).build_lines(20, 10);
+        let b = BarSpinner::new(8).width(20).height(1).build_lines(20, 10);
         assert_ne!(a, b, "tick=0 and tick=8 should differ");
     }
 
@@ -1080,12 +1281,12 @@ mod tests {
             .width(20)
             .height(1)
             .spin(Spin::Clockwise)
-            .build_lines(20);
+            .build_lines(20, 10);
         let ccw = BarSpinner::new(5)
             .width(20)
             .height(1)
             .spin(Spin::CounterClockwise)
-            .build_lines(20);
+            .build_lines(20, 10);
         assert_ne!(cw, ccw, "CW and CCW should differ at the same tick");
     }
 
@@ -1095,12 +1296,12 @@ mod tests {
             .width(20)
             .height(1)
             .ticks_per_step(1)
-            .build_lines(20);
+            .build_lines(20, 10);
         let slow = BarSpinner::new(10)
             .width(20)
             .height(1)
             .ticks_per_step(5)
-            .build_lines(20);
+            .build_lines(20, 10);
         assert_ne!(
             fast, slow,
             "different speeds should produce different output"
@@ -1238,7 +1439,7 @@ mod tests {
         assert_eq!(s.fade_width, 0);
 
         // Sharp fade: every arc cell should show full density (FADE[3] = 0xFF).
-        let lines = s.width(12).build_lines(12);
+        let lines = s.width(12).build_lines(12, 10);
         // All spans should be ⣿ (U+28FF) in arc_color OR ⣿ in dim_color (Full track).
         for line in &lines {
             for span in &line.spans {
@@ -1330,7 +1531,7 @@ mod tests {
         let lines = BarSpinner::new(0)
             .width(20)
             .bar_style(BarStyle::Block)
-            .build_lines(20);
+            .build_lines(20, 10);
         // Every character should be either █ or ░
         for line in &lines {
             for span in &line.spans {
@@ -1428,5 +1629,43 @@ mod tests {
     fn motion_builder() {
         let s = BarSpinner::new(0).motion(BarMotion::Loop);
         assert_eq!(s.motion, BarMotion::Loop);
+    }
+
+    #[test]
+    fn vertical_orientation_builder() {
+        let s = BarSpinner::new(0).orientation(BarOrientation::Vertical);
+        assert_eq!(s.orientation, BarOrientation::Vertical);
+    }
+
+    #[test]
+    fn vertical_renders_correct_row_count() {
+        let h = 12usize;
+        let lines = BarSpinner::new(0)
+            .orientation(BarOrientation::Vertical)
+            .width(3)
+            .build_lines(3, h);
+        assert_eq!(lines.len(), h, "vertical bar should produce {h} lines");
+    }
+
+    #[test]
+    fn vertical_renders_correct_col_count() {
+        let w = 4usize;
+        let lines = BarSpinner::new(0)
+            .orientation(BarOrientation::Vertical)
+            .width(w)
+            .build_lines(w, 10);
+        for line in &lines {
+            assert_eq!(line.spans.len(), w, "each row should have {w} spans");
+        }
+    }
+
+    #[test]
+    fn vertical_loop_does_not_panic() {
+        let lines = BarSpinner::new(99)
+            .orientation(BarOrientation::Vertical)
+            .motion(BarMotion::Loop)
+            .width(2)
+            .build_lines(2, 15);
+        assert_eq!(lines.len(), 15);
     }
 }

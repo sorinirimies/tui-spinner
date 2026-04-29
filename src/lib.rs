@@ -102,7 +102,7 @@ mod linear_spinner;
 mod rect_spinner;
 mod square_spinner;
 
-pub use bar_spinner::{BarMotion, BarSpinner, BarStyle, BarTrack};
+pub use bar_spinner::{BarMotion, BarOrientation, BarSpinner, BarStyle, BarTrack};
 pub use circle_spinner::CircleSpinner;
 pub use flux_spinner::{FluxFrames, FluxSpinner};
 pub use linear_spinner::{Direction, Flow, LinearSpinner, LinearStyle};
