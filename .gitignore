@@ -68,7 +68,9 @@ Session.vim
 tags
 
 # Zed
-.zed/
+# Zed editor settings that should NOT be tracked (local overrides)
+# .zed/settings.json  ← un-comment to ignore local settings
+# .zed/tasks.json     ← un-comment to ignore local tasks
 
 # Emacs
 \#*\#

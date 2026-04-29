@@ -2,7 +2,6 @@
 
 [![Crates.io](https://img.shields.io/crates/v/tui-spinner.svg)](https://crates.io/crates/tui-spinner)
 [![Docs.rs](https://docs.rs/tui-spinner/badge.svg)](https://docs.rs/tui-spinner)
-[![CI](https://github.com/sorinirimies/tui-spinner/actions/workflows/ci.yml/badge.svg)](https://github.com/sorinirimies/tui-spinner/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) TUI applications.
