@@ -2,7 +2,7 @@
 //!
 //! Every style cell shows three bars: → Bounce, ← Bounce, ⟳ Loop.
 //!
-//! Page 1: Mixed styles overview (3×2 compact grid)
+//! Page 1: Mixed styles overview (4×3 compact grid)
 //! Page 2: Symbol Styles (4×4 grid, all 16 variants)
 //! Page 3: Knobs (arc width, track, fade, arc char)
 //!
@@ -208,6 +208,7 @@ where
 
 const OVERVIEW: &[(BarStyle, BarTrack, usize, usize, &str, Color)] = &[
     // (style, track, height, fade_width, label, color)
+    // Row 1 — Braille variants
     (
         BarStyle::Braille,
         BarTrack::Rail,
@@ -221,9 +222,26 @@ const OVERVIEW: &[(BarStyle, BarTrack, usize, usize, &str, Color)] = &[
         BarTrack::Full,
         1,
         0,
-        "Braille  Full  fade=0",
+        "Braille  Full  0",
         Color::White,
     ),
+    (
+        BarStyle::Braille,
+        BarTrack::Rail,
+        2,
+        3,
+        "Braille  h=2",
+        Color::LightBlue,
+    ),
+    (
+        BarStyle::Braille,
+        BarTrack::Empty,
+        1,
+        3,
+        "Braille  Empty",
+        Color::LightMagenta,
+    ),
+    // Row 2 — Block / geometric
     (
         BarStyle::Block,
         BarTrack::Rail,
@@ -233,12 +251,45 @@ const OVERVIEW: &[(BarStyle, BarTrack, usize, usize, &str, Color)] = &[
         Color::LightGreen,
     ),
     (
+        BarStyle::Shade,
+        BarTrack::Rail,
+        1,
+        3,
+        "Shade    ▓░",
+        Color::LightCyan,
+    ),
+    (
+        BarStyle::Diamond,
+        BarTrack::Rail,
+        1,
+        3,
+        "Diamond  ◆◇",
+        Color::Magenta,
+    ),
+    (
+        BarStyle::Square,
+        BarTrack::Rail,
+        1,
+        3,
+        "Square   ■□",
+        Color::LightRed,
+    ),
+    // Row 3 — Symbols / patterns
+    (
         BarStyle::Star,
         BarTrack::Rail,
         1,
         3,
         "Star     ★☆",
         Color::Rgb(255, 220, 80),
+    ),
+    (
+        BarStyle::Heart,
+        BarTrack::Rail,
+        1,
+        3,
+        "Heart    ♥♡",
+        Color::Rgb(255, 120, 160),
     ),
     (
         BarStyle::Progress,
@@ -259,17 +310,17 @@ const OVERVIEW: &[(BarStyle, BarTrack, usize, usize, &str, Color)] = &[
 ];
 
 fn page_overview(frame: &mut Frame, area: Rect, tick: u64) {
-    // Fixed 5-row cells: 2 borders + 3 trio bars — no wasted space.
-    let row_cs: Vec<Constraint> = (0..2)
+    // 4 cols × 3 rows = 12 cells, each exactly 5 rows (2 borders + 3 trio bars).
+    let row_cs: Vec<Constraint> = (0..3)
         .map(|_| Constraint::Length(5))
         .chain([Constraint::Min(0)])
         .collect();
-    let col_cs: Vec<Constraint> = (0..3).map(|_| Constraint::Ratio(1, 3)).collect();
+    let col_cs: Vec<Constraint> = (0..4).map(|_| Constraint::Ratio(1, 4)).collect();
     let rows = Layout::vertical(row_cs).split(area);
 
     for (i, &(style, track, height, fade, label, color)) in OVERVIEW.iter().enumerate() {
-        let r = i / 3;
-        let c = i % 3;
+        let r = i / 4;
+        let c = i % 4;
         if r >= rows.len().saturating_sub(1) {
             break;
         }
