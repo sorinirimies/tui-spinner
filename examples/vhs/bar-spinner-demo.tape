@@ -1,4 +1,4 @@
-# VHS tape for BarSpinner — horizontal + vertical pages
+# VHS tape for BarSpinner — horizontal + vertical + thickness pages
 # Run: vhs examples/vhs/bar-spinner-demo.tape
 
 Output examples/vhs/generated/bar-spinner-demo.gif
@@ -15,10 +15,14 @@ Enter
 Sleep 12s
 Show
 
-# Page 1: Horizontal bars
+# Page 1: Horizontal bars (5 motions)
 Sleep 7s
 
 # Page 2: Vertical bars
+Type "l"
+Sleep 7s
+
+# Page 3: Thickness variations
 Type "l"
 Sleep 7s
 

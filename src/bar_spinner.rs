@@ -200,10 +200,12 @@ impl BarStyle {
 
 /// Controls how the arc behaves when it reaches the edge of the bar.
 ///
-/// | Variant  | Behaviour |
-/// |----------|-----------|
-/// | `Bounce` | Reverses at each edge — classic ping-pong (default) |
-/// | `Loop`   | Wraps around: when the arc exits one edge it re-enters from the other |
+/// | Variant    | Behaviour |
+/// |------------|----------------------------------------------------------------------|
+/// | `Bounce`   | Reverses at each edge — classic ping-pong (default)                   |
+/// | `Loop`     | Wraps around: when the arc exits one edge it re-enters the other     |
+/// | `Squeeze`  | Two arcs converge from both edges toward the centre then bounce back |
+/// | `Radiate`  | Two arcs radiate outward from the centre and wrap back continuously  |
 ///
 /// Combined with [`Spin`], `Loop` produces a continuous sweep:
 /// - `Spin::Clockwise` + `Loop` → sweeps left → right endlessly
@@ -219,6 +221,12 @@ impl BarStyle {
 ///
 /// // Continuous left-to-right sweep
 /// let sweep = BarSpinner::new(0).spin(Spin::Clockwise).motion(BarMotion::Loop);
+///
+/// // Converge from both edges
+/// let squeeze = BarSpinner::new(0).motion(BarMotion::Squeeze);
+///
+/// // Radiate outward from centre continuously
+/// let radiate = BarSpinner::new(0).motion(BarMotion::Radiate);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BarMotion {
@@ -227,6 +235,10 @@ pub enum BarMotion {
     Bounce,
     /// Wrap around: exit one edge and re-enter from the other.
     Loop,
+    /// Two arcs converge from both edges toward the centre, then bounce back.
+    Squeeze,
+    /// Two arcs radiate outward from the centre and wrap back continuously.
+    Radiate,
 }
 
 // ── Orientation ───────────────────────────────────────────────────────────────
@@ -304,11 +316,22 @@ impl RectEngine {
             char_w.div_ceil(3).max(4)
         };
 
-        let going_forward = matches!(spin, Spin::Clockwise);
-        let anchor = if going_forward {
-            0
-        } else {
-            char_w.saturating_sub(arc_cols)
+        let going_forward = match motion {
+            // Squeeze always starts moving inward (forward = converging).
+            BarMotion::Squeeze => true,
+            // Radiate always starts moving outward.
+            BarMotion::Radiate => true,
+            _ => matches!(spin, Spin::Clockwise),
+        };
+        let anchor = match motion {
+            BarMotion::Squeeze | BarMotion::Radiate => 0, // phase 0 = arcs at centre/edges
+            _ => {
+                if going_forward {
+                    0
+                } else {
+                    char_w.saturating_sub(arc_cols)
+                }
+            }
         };
 
         Self {
@@ -340,14 +363,33 @@ impl RectEngine {
             }
             BarMotion::Loop => {
                 // Anchor travels the full 0..char_w range modularly.
-                // render_lines uses (ci - anchor) % char_w to detect the arc,
-                // so the glyph phases in at the leading edge while phasing out
-                // at the trailing edge in the same frame.
                 if self.going_forward {
                     self.anchor = (self.anchor + 1) % self.char_w;
                 } else {
                     self.anchor = (self.anchor + self.char_w - 1) % self.char_w;
                 }
+            }
+            BarMotion::Squeeze => {
+                // `anchor` represents how far each arc has moved inward from
+                // its respective edge.  Max inward = centre meeting point.
+                let half = self.char_w.saturating_sub(self.arc_cols) / 2;
+                if self.going_forward {
+                    if self.anchor < half {
+                        self.anchor += 1;
+                    } else {
+                        self.going_forward = false;
+                    }
+                } else if self.anchor > 0 {
+                    self.anchor -= 1;
+                } else {
+                    self.going_forward = true;
+                }
+            }
+            BarMotion::Radiate => {
+                // `anchor` represents how far each arc has moved outward from
+                // the centre.  Wraps back to 0 (centre) when it reaches the edge.
+                let half = self.char_w.saturating_sub(self.arc_cols) / 2;
+                self.anchor = (self.anchor + 1) % (half + 1);
             }
         }
     }
@@ -383,12 +425,49 @@ impl RectEngine {
                             }
                             BarMotion::Loop => {
                                 // Modular offset: how far past `anchor` is `ci`?
-                                // This correctly handles the wrap-around case where
-                                // part of the arc is near the right edge and part
-                                // has already reappeared at the left edge.
                                 let offset = (ci + char_w - self.anchor) % char_w;
                                 if offset < arc_cols {
                                     let fe = offset.min(arc_cols - 1 - offset);
+                                    (true, fe)
+                                } else {
+                                    (false, 0)
+                                }
+                            }
+                            BarMotion::Squeeze => {
+                                // Two arcs: one from left, one from right.
+                                // Left arc: starts at `anchor`, width `arc_cols`.
+                                // Right arc: mirror from right edge.
+                                let left_start = self.anchor;
+                                let left_end = left_start + arc_cols;
+                                let right_end = char_w.saturating_sub(self.anchor);
+                                let right_start = right_end.saturating_sub(arc_cols);
+
+                                if ci >= left_start && ci < left_end {
+                                    let fe = (ci - left_start).min(left_end - 1 - ci);
+                                    (true, fe)
+                                } else if ci >= right_start && ci < right_end {
+                                    let fe = (ci - right_start).min(right_end - 1 - ci);
+                                    (true, fe)
+                                } else {
+                                    (false, 0)
+                                }
+                            }
+                            BarMotion::Radiate => {
+                                // Two arcs emanating from the centre outward.
+                                // `anchor` = how far each arc has moved from centre.
+                                let centre = char_w / 2;
+                                // Right arc: centre moves rightward by `anchor`.
+                                let right_start = centre + self.anchor;
+                                let right_end = right_start + arc_cols;
+                                // Left arc: centre moves leftward by `anchor`.
+                                let left_end = centre.saturating_sub(self.anchor);
+                                let left_start = left_end.saturating_sub(arc_cols);
+
+                                if ci >= right_start && ci < right_end.min(char_w) {
+                                    let fe = (ci - right_start).min(right_end.min(char_w) - 1 - ci);
+                                    (true, fe)
+                                } else if ci >= left_start && ci < left_end {
+                                    let fe = (ci - left_start).min(left_end - 1 - ci);
                                     (true, fe)
                                 } else {
                                     (false, 0)
@@ -452,11 +531,19 @@ impl VertRectEngine {
             char_h.div_ceil(3).max(2)
         };
 
-        let going_forward = matches!(spin, Spin::Clockwise);
-        let anchor = if going_forward {
-            0
-        } else {
-            char_h.saturating_sub(arc_rows)
+        let going_forward = match motion {
+            BarMotion::Squeeze | BarMotion::Radiate => true,
+            _ => matches!(spin, Spin::Clockwise),
+        };
+        let anchor = match motion {
+            BarMotion::Squeeze | BarMotion::Radiate => 0,
+            _ => {
+                if going_forward {
+                    0
+                } else {
+                    char_h.saturating_sub(arc_rows)
+                }
+            }
         };
 
         Self {
@@ -492,6 +579,26 @@ impl VertRectEngine {
                     self.anchor = (self.anchor + self.char_h - 1) % self.char_h;
                 }
             }
+            BarMotion::Squeeze => {
+                let half = self.char_h.saturating_sub(self.arc_rows) / 2;
+                if self.going_forward {
+                    if self.anchor < half {
+                        self.anchor += 1;
+                    } else {
+                        self.going_forward = false;
+                    }
+                } else if self.anchor > 0 {
+                    self.anchor -= 1;
+                } else {
+                    self.going_forward = true;
+                }
+            }
+            BarMotion::Radiate => {
+                // `anchor` = how far each arc has moved outward from centre.
+                // Wraps back to 0 (centre) when it reaches the edge.
+                let half = self.char_h.saturating_sub(self.arc_rows) / 2;
+                self.anchor = (self.anchor + 1) % (half + 1);
+            }
         }
     }
 
@@ -511,6 +618,26 @@ impl VertRectEngine {
                 let in_arc = match self.motion {
                     BarMotion::Bounce => row >= self.anchor && row < self.anchor + arc_rows,
                     BarMotion::Loop => (row + char_h - self.anchor) % char_h < arc_rows,
+                    BarMotion::Squeeze => {
+                        // Two arcs: one from top, one from bottom.
+                        let top_start = self.anchor;
+                        let top_end = top_start + arc_rows;
+                        let bot_end = char_h.saturating_sub(self.anchor);
+                        let bot_start = bot_end.saturating_sub(arc_rows);
+                        (row >= top_start && row < top_end) || (row >= bot_start && row < bot_end)
+                    }
+                    BarMotion::Radiate => {
+                        // Two arcs emanating from centre outward.
+                        let centre = char_h / 2;
+                        // Downward arc: starts at centre, moves down by `anchor`.
+                        let down_start = centre + self.anchor;
+                        let down_end = down_start + arc_rows;
+                        // Upward arc: starts at centre, moves up by `anchor`.
+                        let up_end = centre.saturating_sub(self.anchor);
+                        let up_start = up_end.saturating_sub(arc_rows);
+                        (row >= down_start && row < down_end.min(char_h))
+                            || (row >= up_start && row < up_end)
+                    }
                 };
 
                 let (ch, color) = if let Some((arc_ch, track_ch)) = style_chars {
@@ -613,6 +740,8 @@ pub struct BarSpinner<'a> {
     motion: BarMotion,
     /// Bar orientation: horizontal (default) or vertical.
     orientation: BarOrientation,
+    /// Cross-axis thickness override (`0` = use `height` for horizontal / `width` for vertical).
+    thickness: usize,
     block: Option<Block<'a>>,
     style: Style,
     alignment: Alignment,
@@ -708,6 +837,7 @@ impl<'a> BarSpinner<'a> {
             bar_style: BarStyle::Braille,
             motion: BarMotion::Bounce,
             orientation: BarOrientation::Horizontal,
+            thickness: 0,
             block: None,
             style: Style::default(),
             alignment: Alignment::Left,
@@ -940,6 +1070,8 @@ impl<'a> BarSpinner<'a> {
     ///
     /// - [`BarMotion::Bounce`] — reverses at each edge (ping-pong).
     /// - [`BarMotion::Loop`] — wraps around; use with [`Spin`] to set the sweep direction.
+    /// - [`BarMotion::Squeeze`] — two arcs converge from both edges toward the centre then bounce back.
+    /// - [`BarMotion::Radiate`] — two arcs radiate outward from the centre and wrap back continuously.
     ///
     /// # Examples
     ///
@@ -950,6 +1082,12 @@ impl<'a> BarSpinner<'a> {
     /// let sweep = BarSpinner::new(0)
     ///     .spin(Spin::Clockwise)
     ///     .motion(BarMotion::Loop);
+    ///
+    /// // Converge from both edges
+    /// let squeeze = BarSpinner::new(0).motion(BarMotion::Squeeze);
+    ///
+    /// // Radiate outward from centre
+    /// let radiate = BarSpinner::new(0).motion(BarMotion::Radiate);
     /// ```
     #[must_use]
     pub fn motion(mut self, motion: BarMotion) -> Self {
@@ -978,6 +1116,33 @@ impl<'a> BarSpinner<'a> {
     #[must_use]
     pub fn orientation(mut self, orientation: BarOrientation) -> Self {
         self.orientation = orientation;
+        self
+    }
+
+    /// Sets the cross-axis **thickness** (default `0` = use existing `height`/`width`).
+    ///
+    /// This is an orientation-aware convenience:
+    /// - **Horizontal** bars → sets the row count (same as `.height()`).
+    /// - **Vertical** bars   → sets the column count (same as `.width()`).
+    ///
+    /// Pass `0` to fall back to the per-axis defaults.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tui_spinner::{BarSpinner, BarOrientation};
+    ///
+    /// // Thick horizontal bar (3 rows):
+    /// let h = BarSpinner::new(0).thickness(3);
+    ///
+    /// // Thick vertical bar (3 columns):
+    /// let v = BarSpinner::new(0)
+    ///     .orientation(BarOrientation::Vertical)
+    ///     .thickness(3);
+    /// ```
+    #[must_use]
+    pub fn thickness(mut self, n: usize) -> Self {
+        self.thickness = n;
         self
     }
 
@@ -1042,15 +1207,24 @@ impl<'a> BarSpinner<'a> {
         match self.orientation {
             BarOrientation::Horizontal => {
                 let w = actual_width.max(3);
-                let mut engine =
-                    RectEngine::build(w, self.height, self.arc_width, self.spin, self.motion);
+                // thickness overrides row count for horizontal bars.
+                let h = if self.thickness > 0 {
+                    self.thickness
+                } else {
+                    self.height
+                };
+                // Disable fade for multi-row bars: the graduated braille dots
+                // create ugly stepped/diagonal edges when stacked vertically.
+                // Single-row bars keep the smooth gradient.
+                let fade = if h > 1 { 0 } else { self.fade_width };
+                let mut engine = RectEngine::build(w, h, self.arc_width, self.spin, self.motion);
                 for _ in 0..steps {
                     engine.walk();
                 }
                 engine.render_lines(
                     self.arc_color,
                     self.dim_color,
-                    self.fade_width,
+                    fade,
                     self.track.byte(),
                     self.arc_byte,
                     self.bar_style.chars(),
@@ -1059,7 +1233,10 @@ impl<'a> BarSpinner<'a> {
             BarOrientation::Vertical => {
                 // For vertical bars the width field controls the column count
                 // and the available area height drives the bar length.
-                let char_w = if self.width == 0 {
+                // thickness overrides column count for vertical bars.
+                let char_w = if self.thickness > 0 {
+                    self.thickness
+                } else if self.width == 0 {
                     actual_width
                 } else {
                     self.width
