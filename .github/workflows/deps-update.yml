@@ -59,6 +59,59 @@ jobs:
       - name: Sync Cargo.lock
         run: cargo update
 
+      # ── Reject downgrades ────────────────────────────────────────────────────
+      # Compare every version in Cargo.toml before/after the upgrade.
+      # If any dependency version decreased, abort — upgrades only.
+      - name: Reject version downgrades
+        run: |
+          echo "🔍 Checking for version downgrades in Cargo.toml…"
+
+          git show HEAD:Cargo.toml > /tmp/old_cargo.toml
+
+          extract_deps() {
+            awk '
+              /^\[dependencies\]/ || /^\[dev-dependencies\]/ || /^\[build-dependencies\]/ { in_deps=1; next }
+              /^\[/ { in_deps=0 }
+              in_deps && /version\s*=/ {
+                if (match($0, /^([a-zA-Z0-9_-]+)\s*=.*version\s*=\s*"([^"]+)"/, m)) {
+                  print m[1], m[2]
+                }
+              }
+              in_deps && /^[a-zA-Z0-9_-]+\s*=\s*"/ {
+                if (match($0, /^([a-zA-Z0-9_-]+)\s*=\s*"([^"]+)"/, m)) {
+                  print m[1], m[2]
+                }
+              }
+            ' "$1"
+          }
+
+          extract_deps /tmp/old_cargo.toml | sort > /tmp/old_versions.txt
+          extract_deps Cargo.toml | sort > /tmp/new_versions.txt
+
+          downgrades=""
+          while read -r pkg old_ver; do
+            new_ver=$(awk -v p="$pkg" '$1 == p { print $2 }' /tmp/new_versions.txt)
+            [ -z "$new_ver" ] && continue
+
+            higher=$(printf '%s\n%s\n' "$old_ver" "$new_ver" | sort -V | tail -n1)
+            if [ "$higher" = "$old_ver" ] && [ "$old_ver" != "$new_ver" ]; then
+              echo "❌ DOWNGRADE: $pkg $old_ver → $new_ver"
+              downgrades="$downgrades $pkg"
+            fi
+          done < /tmp/old_versions.txt
+
+          if [ -n "$downgrades" ]; then
+            echo ""
+            echo "🚫 Aborting — version downgrades detected. Only upgrades are allowed."
+            echo "   Affected packages:$downgrades"
+            echo "   Restoring original Cargo.toml…"
+            git checkout -- Cargo.toml
+            cargo update
+            exit 1
+          fi
+
+          echo "✅ No downgrades detected — all changes are upgrades."
+
       - name: Check for changes
         id: changes
         run: |
