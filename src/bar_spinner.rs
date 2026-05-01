@@ -318,9 +318,8 @@ impl RectEngine {
 
         let going_forward = match motion {
             // Squeeze always starts moving inward (forward = converging).
-            BarMotion::Squeeze => true,
             // Radiate always starts moving outward.
-            BarMotion::Radiate => true,
+            BarMotion::Squeeze | BarMotion::Radiate => true,
             _ => matches!(spin, Spin::Clockwise),
         };
         let anchor = match motion {
