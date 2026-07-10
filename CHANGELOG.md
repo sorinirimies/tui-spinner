@@ -2,52 +2,56 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.2.3 - 2026-04-29
-### 🐛 Bug Fixes
-- fix: bump_version.nu passes --tag to git-cliff so commits land under the release version
-### 📚 Documentation
-- docs: add crates.io downloads badge to README
-- docs: move combined overview GIF to first preview; fix BarSpinner heading
-**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.2.2...v0.2.3
-## 0.2.2 - 2026-04-29
+## 0.3.0 - 2026-07-10
 ### ♻️ Refactor
 - refactor: shared macros + BarSpinner::with_colors + new edge-case tests
 - refactor: collapse bar_spinner to single page — 16 styles, no duplicates
-### 🐛 Bug Fixes
-- fix: bar_spinner page 1 — tight 3×2 mixed grid; tape shows all 3 pages
-- fix: bar_spinner page 1 — 4×3 grid (was 3×2), 12 mixed styles
-- fix: bar_spinner pages 1+2 — two 2-row banks with 1-row gap
-- fix: bar_spinner — 4 individual rows with equal gaps, last row pushed down
-- fix: add 8% horizontal margins so cells are ~21% wide instead of 25%
-- fix: header and footer same width as grid (8% margins); fix unicode escapes
-### 📚 Documentation
-- docs: regenerate bar-spinner-demo.gif and spinner-demo.gif
-- docs: update README for 0.2.x
-- docs: remove CI badge; add .zed/rules.md with agent best practices
-### 🔧 Chores
-- chore(deps): nightly dependency upgrade 2026-04-29
-- chore(deps): update ratatui 0.29 → 0.30; refresh Cargo.lock
-- chore: bump version to 0.2.2
-**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.2.1...v0.2.2
-## 0.2.1 - 2026-04-29
 ### ✨ Features
 - feat: BarStyle enum (Block/Shade/Dot/Diamond/Square); example sections
 - feat: 4 more BarStyles (Progress/Thick/Wave/Pip) from tui-slider symbols; 4x4 grid
 - feat: BarMotion::Loop — continuous sweep mode for BarSpinner
 - feat: trio helper shows → ← ⟳ per style; BarSpinner row in spinner.rs
+- feat: vertical page uses same 4x4 cell grid as horizontal; regenerate all GIFs
+- feat: add Squeeze, Radiate motions, thickness API, and per-spinner labels
+- feat(spinner): add to_lines()/to_text() to embed spinners in other widgets
 ### ➕ Added
 - Add CI scripts for quality gate, release notes, and tag validation
 ### 🐛 Bug Fixes
 - fix: bar_spinner example — 1 CW + 1 CCW per concept, distinct patterns
 - fix: BarMotion::Loop — modular phase-in/out at both edges simultaneously
 - fix: Bounce vs Loop shown as single CW bars so motion difference is obvious
+- fix: bar_spinner page 1 — tight 3×2 mixed grid; tape shows all 3 pages
+- fix: bar_spinner page 1 — 4×3 grid (was 3×2), 12 mixed styles
+- fix: bar_spinner pages 1+2 — two 2-row banks with 1-row gap
+- fix: bar_spinner — 4 individual rows with equal gaps, last row pushed down
+- fix: add 8% horizontal margins so cells are ~21% wide instead of 25%
+- fix: header and footer same width as grid (8% margins); fix unicode escapes
+- fix: bump_version.nu passes --tag to git-cliff so commits land under the release version
+- fix: upgrade ratatui to 0.30, add downgrade rejection to dep-update workflows
+- fix: merge identical match arms to satisfy clippy::match_same_arms
+### 📚 Documentation
+- docs: regenerate bar-spinner-demo.gif and spinner-demo.gif
+- docs: update README for 0.2.x
+- docs: remove CI badge; add .zed/rules.md with agent best practices
+- docs: add crates.io downloads badge to README
+- docs: move combined overview GIF to first preview; fix BarSpinner heading
 ### 🔧 Chores
 - chore(deps): nightly dependency upgrade 2026-04-28
 - chore: bump version to 0.2.0
 - chore: fix example warnings for 0.2.0 release
 - chore(deps): update ratatui 0.29 → 0.30; update unicode-width
 - chore: bump version to 0.2.1
-**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.1.2...v0.2.1
+- chore(deps): nightly dependency upgrade 2026-04-29
+- chore(deps): update ratatui 0.29 → 0.30; refresh Cargo.lock
+- chore: bump version to 0.2.2
+- chore: bump version to 0.2.3
+- chore: remove stale gitea remote references, keep only origin + gitea_starscream
+- chore: restore all 3 remotes (origin, gitea, gitea_starscream)
+- chore(deps): nightly dependency upgrade 2026-04-30
+- chore: restore all 3 remotes (origin, gitea, gitea_starscream)
+- chore: use compatible-only cargo upgrade to prevent downgrades
+- chore(deps): upgrade ratatui to 0.30 and refresh Cargo.lock
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.1.2...v0.3.0
 ## 0.1.2 - 2026-04-28
 ### ✨ Features
 - feat: BarSpinner — BarTrack + fade_width; Hide compile in all VHS tapes
