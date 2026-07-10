@@ -66,11 +66,10 @@ jobs:
           ref: ${{ needs.validate.outputs.tag }}
           fetch-depth: 0
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install git-cliff
-        run: cargo install git-cliff --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
 
       - name: Install Nushell
         uses: hustcer/setup-nu@v3
