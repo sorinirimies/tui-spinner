@@ -73,7 +73,9 @@ jobs:
         run: cargo install git-cliff --locked
 
       - name: Install Nushell
-        run: cargo install nu --locked
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "0.111.0"
 
       - name: Generate release notes (RELEASE_NOTES.md + CHANGELOG.md)
         run: nu scripts/ci/release_notes.nu ${{ needs.validate.outputs.tag }}

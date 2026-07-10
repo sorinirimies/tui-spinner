@@ -118,7 +118,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install Nushell
-        run: cargo install nu --locked
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "0.111.0"
 
       - name: Run Nu script tests
         run: nu scripts/tests/run_all.nu
