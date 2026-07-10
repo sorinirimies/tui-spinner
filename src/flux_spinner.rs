@@ -260,6 +260,32 @@ impl FluxFrames {
 /// // Custom frame sequence
 /// let line = FluxSpinner::new(42).frames(FluxFrames::LINE);
 /// ```
+///
+/// ## Embedding in another widget
+///
+/// Use [`to_lines`](FluxSpinner::to_lines) or
+/// [`to_text`](FluxSpinner::to_text) to drop the current frame into any widget
+/// that accepts text content, such as a table
+/// [`Cell`](ratatui::widgets::Cell):
+///
+/// ```
+/// use ratatui::style::Color;
+/// use ratatui::text::Line;
+/// use ratatui::widgets::Cell;
+/// use tui_spinner::{FluxSpinner, Spin};
+///
+/// let spinner = FluxSpinner::new(3)
+///     .width(12)
+///     .spin(Spin::CounterClockwise)
+///     .color(Color::Cyan);
+///
+/// let mut lines: Vec<Line> = vec![Line::from("The cell content")];
+/// lines.extend(spinner.to_lines());
+/// let _cell = Cell::from(lines);
+///
+/// // …or straight to Text
+/// let _cell = Cell::from(FluxSpinner::new(0).width(8).to_text());
+/// ```
 #[derive(Debug, Clone)]
 pub struct FluxSpinner<'a> {
     tick: u64,
@@ -520,6 +546,8 @@ impl<'a> FluxSpinner<'a> {
 // ── Trait impls ───────────────────────────────────────────────────────────────
 
 impl_styled_for!(FluxSpinner<'_>);
+
+impl_to_text!(FluxSpinner<'_>, build_lines);
 
 impl_widget_via_ref!(FluxSpinner<'_>);
 
@@ -856,5 +884,17 @@ mod tests {
             braille, line,
             "different frame sets produce different output"
         );
+    }
+
+    #[test]
+    fn to_lines_matches_build_lines() {
+        let s = FluxSpinner::new(3).width(6).height(2);
+        assert_eq!(s.to_lines(), s.build_lines());
+    }
+
+    #[test]
+    fn to_text_has_expected_row_count() {
+        let s = FluxSpinner::new(0).width(4).height(3);
+        assert_eq!(s.to_text().lines.len(), 3);
     }
 }

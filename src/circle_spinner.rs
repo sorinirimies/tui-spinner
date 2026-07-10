@@ -530,6 +530,8 @@ impl<'a> CircleSpinner<'a> {
 
 impl_styled_for!(CircleSpinner<'_>);
 
+impl_to_text!(CircleSpinner<'_>, build_lines);
+
 impl_widget_via_ref!(CircleSpinner<'_>);
 
 impl Widget for &CircleSpinner<'_> {
@@ -802,5 +804,12 @@ mod tests {
             has_content,
             "spinner should render some visible braille dots"
         );
+    }
+
+    #[test]
+    fn to_lines_matches_build_lines() {
+        let s = CircleSpinner::new(4).radius(3);
+        assert_eq!(s.to_lines(), s.build_lines());
+        assert_eq!(s.to_text().lines.len(), s.build_lines().len());
     }
 }

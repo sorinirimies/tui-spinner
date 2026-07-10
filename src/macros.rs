@@ -87,3 +87,41 @@ macro_rules! render_spinner_body {
             .render(inner_area, $buf);
     }};
 }
+
+// ── Embeddable text conversion ────────────────────────────────────────────────
+
+/// Implements `to_lines()` / `to_text()` for a spinner type, so its current
+/// frame can be embedded in other widgets that accept text content (e.g. a
+/// table `Cell` or a `Paragraph`).
+///
+/// `$builder` is the private method that produces the `Vec<Line>` for the
+/// current frame (typically `build_lines` or `render_lines`).
+///
+/// ```text
+/// impl_to_text!(FluxSpinner<'_>, build_lines);
+/// ```
+macro_rules! impl_to_text {
+    ($t:ty, $builder:ident) => {
+        impl $t {
+            /// Renders the current frame as a `Vec<Line>`, one
+            /// [`Line`](ratatui::text::Line) per row.
+            ///
+            /// Exposed so the spinner can be embedded in other widgets that
+            /// accept lines or text, such as a table
+            /// [`Cell`](ratatui::widgets::Cell) or a
+            /// [`Paragraph`](ratatui::widgets::Paragraph).
+            #[must_use]
+            pub fn to_lines(&self) -> Vec<ratatui::text::Line<'static>> {
+                self.$builder()
+            }
+
+            /// Renders the current frame as a
+            /// [`Text`](ratatui::text::Text) value for embedding in widgets
+            /// whose content is a `Text`.
+            #[must_use]
+            pub fn to_text(&self) -> ratatui::text::Text<'static> {
+                ratatui::text::Text::from(self.$builder())
+            }
+        }
+    };
+}

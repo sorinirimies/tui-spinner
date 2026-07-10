@@ -531,6 +531,8 @@ impl<'a> RectSpinner<'a> {
 
 impl_styled_for!(RectSpinner<'_>);
 
+impl_to_text!(RectSpinner<'_>, render_lines);
+
 impl_widget_via_ref!(RectSpinner<'_>);
 
 impl Widget for &RectSpinner<'_> {
@@ -607,5 +609,12 @@ mod tests {
         Widget::render(&RectSpinner::new(0), area, &mut b0);
         Widget::render(&RectSpinner::new(5), area, &mut b5);
         assert_ne!(b0, b5);
+    }
+
+    #[test]
+    fn to_lines_matches_render_lines() {
+        let s = RectSpinner::new(3);
+        assert_eq!(s.to_lines(), s.render_lines());
+        assert_eq!(s.to_text().lines.len(), s.render_lines().len());
     }
 }

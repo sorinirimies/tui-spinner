@@ -466,6 +466,17 @@ impl<'a> LinearSpinner<'a> {
     // ── Horizontal rendering ──────────────────────────────────────────────────
 
     /// Builds the single [`Line`] used in horizontal mode.
+    /// Builds the current frame as a `Vec<Line>`.
+    ///
+    /// In [`Direction::Horizontal`] mode this is a single [`Line`]; in
+    /// [`Direction::Vertical`] mode the column is `total_slots` rows tall.
+    fn build_lines(&self) -> Vec<Line<'static>> {
+        match self.direction {
+            Direction::Horizontal => vec![self.build_horizontal_line()],
+            Direction::Vertical => self.build_vertical_lines(self.total_slots.max(1)),
+        }
+    }
+
     fn build_horizontal_line(&self) -> Line<'static> {
         let total = self.total_slots.max(1);
         let lit = self.lit_slots.min(total);
@@ -546,6 +557,8 @@ impl<'a> LinearSpinner<'a> {
 // ── Styled ────────────────────────────────────────────────────────────────────
 
 impl_styled_for!(LinearSpinner<'_>);
+
+impl_to_text!(LinearSpinner<'_>, build_lines);
 
 // ── Widget ────────────────────────────────────────────────────────────────────
 
@@ -811,5 +824,20 @@ mod tests {
         let area = Rect::new(0, 0, 1, 1);
         let mut buf = Buffer::empty(area);
         Widget::render(&s, area, &mut buf);
+    }
+
+    #[test]
+    fn to_lines_horizontal_is_single_row() {
+        let s = LinearSpinner::new(0).direction(Direction::Horizontal);
+        assert_eq!(s.to_lines().len(), 1);
+        assert_eq!(s.to_text().lines.len(), 1);
+    }
+
+    #[test]
+    fn to_lines_vertical_matches_total_slots() {
+        let s = LinearSpinner::new(0)
+            .direction(Direction::Vertical)
+            .total_slots(5);
+        assert_eq!(s.to_lines().len(), 5);
     }
 }

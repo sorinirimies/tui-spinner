@@ -28,7 +28,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Paragraph, Widget};
 
 use crate::Spin;
@@ -1199,6 +1199,36 @@ impl<'a> BarSpinner<'a> {
         }
     }
 
+    /// Renders the current frame as a `Vec<Line>`, one [`Line`] per row,
+    /// laid out for the given character `width` and `height`.
+    ///
+    /// Unlike the other spinners a bar has no intrinsic size when width is set
+    /// to auto (`0`), so the target dimensions must be supplied explicitly.
+    /// This lets the spinner be embedded in other widgets that accept
+    /// [`Line`]s or [`Text`], such as a table
+    /// [`Cell`](ratatui::widgets::Cell):
+    ///
+    /// ```
+    /// use ratatui::widgets::Cell;
+    /// use tui_spinner::BarSpinner;
+    ///
+    /// let spinner = BarSpinner::new(0);
+    /// let _cell = Cell::from(spinner.to_lines(20, 1));
+    /// ```
+    #[must_use]
+    pub fn to_lines(&self, width: usize, height: usize) -> Vec<Line<'static>> {
+        self.build_lines(width, height)
+    }
+
+    /// Renders the current frame as a [`Text`] value laid out for the given
+    /// character `width` and `height`, for embedding in widgets whose content
+    /// is a [`Text`] (e.g. a table [`Cell`](ratatui::widgets::Cell) or
+    /// [`Paragraph`](ratatui::widgets::Paragraph)).
+    #[must_use]
+    pub fn to_text(&self, width: usize, height: usize) -> Text<'static> {
+        Text::from(self.build_lines(width, height))
+    }
+
     fn build_lines(&self, actual_width: usize, actual_height: usize) -> Vec<Line<'static>> {
         #[allow(clippy::cast_possible_truncation)]
         let steps = (self.tick / self.ticks_per_step) as usize;
@@ -1843,5 +1873,12 @@ mod tests {
             .width(2)
             .build_lines(2, 15);
         assert_eq!(lines.len(), 15);
+    }
+
+    #[test]
+    fn to_lines_matches_build_lines() {
+        let s = BarSpinner::new(3);
+        assert_eq!(s.to_lines(20, 1), s.build_lines(20, 1));
+        assert_eq!(s.to_text(20, 2).lines.len(), s.build_lines(20, 2).len());
     }
 }

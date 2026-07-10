@@ -139,6 +139,39 @@ cargo run --example spinner          # Combined overview of all widgets
 
 ---
 
+## Embedding in Other Widgets
+
+Every spinner can render its current frame as `Vec<Line>` or [`Text`] via
+`to_lines()` / `to_text()`, so it can be dropped into any widget that accepts
+text content — for example a table [`Cell`], a `Paragraph`, or a `List` item.
+
+```rust
+use ratatui::style::Color;
+use ratatui::text::Line;
+use ratatui::widgets::Cell;
+use tui_spinner::{FluxSpinner, Spin};
+
+let spinner = FluxSpinner::new(tick)
+    .width(12)
+    .spin(Spin::CounterClockwise)
+    .color(Color::Cyan);
+
+// Combine static text with the animated spinner in one cell
+let mut lines: Vec<Line> = vec![Line::from("The cell content")];
+lines.extend(spinner.to_lines());
+let cell = Cell::from(lines);
+
+// …or straight to Text
+let cell = Cell::from(FluxSpinner::new(tick).width(8).to_text());
+```
+
+`SquareSpinner`, `CircleSpinner`, `RectSpinner`, `LinearSpinner` and
+`FluxSpinner` expose no-argument `to_lines()` / `to_text()`. `BarSpinner` has
+no intrinsic size (its width can be auto), so it takes explicit dimensions:
+`bar.to_lines(width, height)` / `bar.to_text(width, height)`.
+
+---
+
 ## Widget Reference
 
 ### `LinearSpinner`

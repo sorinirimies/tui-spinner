@@ -609,6 +609,8 @@ impl<'a> SquareSpinner<'a> {
 
 impl_styled_for!(SquareSpinner<'_>);
 
+impl_to_text!(SquareSpinner<'_>, build_lines);
+
 impl_widget_via_ref!(SquareSpinner<'_>);
 
 impl Widget for &SquareSpinner<'_> {
@@ -718,5 +720,12 @@ mod tests {
         assert_eq!(s.arc_color, Color::Cyan);
         assert_eq!(s.dim_color, Color::DarkGray);
         assert_eq!(s.ticks_per_step, 3);
+    }
+
+    #[test]
+    fn to_lines_matches_build_lines() {
+        let s = SquareSpinner::new(4).size(3);
+        assert_eq!(s.to_lines(), s.build_lines());
+        assert_eq!(s.to_text().lines.len(), s.build_lines().len());
     }
 }
