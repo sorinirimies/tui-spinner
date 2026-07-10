@@ -812,4 +812,13 @@ mod tests {
         assert_eq!(s.to_lines(), s.build_lines());
         assert_eq!(s.to_text().lines.len(), s.build_lines().len());
     }
+
+    #[test]
+    fn converts_into_text() {
+        use ratatui::text::Text;
+        let s = CircleSpinner::new(4).radius(2);
+        let by_ref: Text = (&s).into();
+        let by_val: Text = s.clone().into();
+        assert_eq!(by_ref, by_val);
+    }
 }

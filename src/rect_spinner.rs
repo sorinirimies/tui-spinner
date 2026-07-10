@@ -617,4 +617,13 @@ mod tests {
         assert_eq!(s.to_lines(), s.render_lines());
         assert_eq!(s.to_text().lines.len(), s.render_lines().len());
     }
+
+    #[test]
+    fn converts_into_text() {
+        use ratatui::text::Text;
+        let s = RectSpinner::new(3);
+        let by_ref: Text = (&s).into();
+        let by_val: Text = s.clone().into();
+        assert_eq!(by_ref, by_val);
+    }
 }

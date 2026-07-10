@@ -840,4 +840,13 @@ mod tests {
             .total_slots(5);
         assert_eq!(s.to_lines().len(), 5);
     }
+
+    #[test]
+    fn converts_into_text() {
+        use ratatui::text::Text;
+        let s = LinearSpinner::new(0).direction(Direction::Horizontal);
+        let by_ref: Text = (&s).into();
+        let by_val: Text = s.clone().into();
+        assert_eq!(by_ref, by_val);
+    }
 }

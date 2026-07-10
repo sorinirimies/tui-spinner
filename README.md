@@ -134,6 +134,7 @@ cargo run --example circle_spinner   # CircleSpinner: CW and CCW columns
 cargo run --example linear_spinner   # LinearSpinner: all styles × orientation × direction
 cargo run --example bar_spinner      # BarSpinner: Zed/Claude-style bouncing bar
 cargo run --example flux_spinner     # FluxSpinner: all frame presets grid
+cargo run --example table_embed      # Spinners embedded in Table cells (Into<Text>)
 cargo run --example spinner          # Combined overview of all widgets
 ```
 
@@ -179,6 +180,11 @@ let cell = Cell::from(lines);
 `to_lines()` / `to_text()`. `BarSpinner` has no intrinsic size (its width can
 be auto), so it takes explicit dimensions instead:
 `bar.to_lines(width, height)` / `bar.to_text(width, height)`.
+
+![Table Embedding Demo](examples/vhs/generated/table-embed-demo.gif)
+
+See [`examples/table_embed.rs`](examples/table_embed.rs) for the full demo
+(`cargo run --example table_embed`).
 
 ---
 
