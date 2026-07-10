@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.0 - 2026-07-10
+### ✨ Features
+- feat(spinner): implement Into<Text> so spinners embed with no special method
+### 📚 Documentation
+- docs(examples): add table_embed demo for spinners in Table cells
+### 🔄 CI
+- ci: install Nushell via prebuilt hustcer/setup-nu instead of building from source
+- ci: install git-cliff via prebuilt taiki-e/install-action on GitHub
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.3.0...v0.4.0
 ## 0.3.0 - 2026-07-10
 ### ♻️ Refactor
 - refactor: shared macros + BarSpinner::with_colors + new edge-case tests
@@ -51,6 +60,7 @@ All notable changes to this project will be documented in this file.
 - chore: restore all 3 remotes (origin, gitea, gitea_starscream)
 - chore: use compatible-only cargo upgrade to prevent downgrades
 - chore(deps): upgrade ratatui to 0.30 and refresh Cargo.lock
+- chore: bump version to 0.3.0
 **Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.1.2...v0.3.0
 ## 0.1.2 - 2026-04-28
 ### ✨ Features
