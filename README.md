@@ -141,14 +141,13 @@ cargo run --example spinner          # Combined overview of all widgets
 
 ## Embedding in Other Widgets
 
-Every spinner can render its current frame as `Vec<Line>` or [`Text`] via
-`to_lines()` / `to_text()`, so it can be dropped into any widget that accepts
-text content — for example a table [`Cell`], a `Paragraph`, or a `List` item.
+Every spinner implements `Into<Text>`, so it drops straight into any widget
+that accepts text content — a table [`Cell`], a `Paragraph`, a `List` item —
+with **no special method**:
 
 ```rust
 use ratatui::style::Color;
-use ratatui::text::Line;
-use ratatui::widgets::Cell;
+use ratatui::widgets::{Cell, Paragraph};
 use tui_spinner::{FluxSpinner, Spin};
 
 let spinner = FluxSpinner::new(tick)
@@ -156,18 +155,29 @@ let spinner = FluxSpinner::new(tick)
     .spin(Spin::CounterClockwise)
     .color(Color::Cyan);
 
-// Combine static text with the animated spinner in one cell
+let cell = Cell::from(&spinner);            // by reference
+let cell = Cell::from(spinner);             // by value
+let para = Paragraph::new(FluxSpinner::new(tick).width(8));
+```
+
+When you need to **combine** the spinner rows with other text in the same
+cell, use `to_lines()` (or `to_text()`):
+
+```rust
+use ratatui::text::Line;
+use ratatui::widgets::Cell;
+use tui_spinner::FluxSpinner;
+
+let spinner = FluxSpinner::new(tick).width(12);
 let mut lines: Vec<Line> = vec![Line::from("The cell content")];
 lines.extend(spinner.to_lines());
 let cell = Cell::from(lines);
-
-// …or straight to Text
-let cell = Cell::from(FluxSpinner::new(tick).width(8).to_text());
 ```
 
 `SquareSpinner`, `CircleSpinner`, `RectSpinner`, `LinearSpinner` and
-`FluxSpinner` expose no-argument `to_lines()` / `to_text()`. `BarSpinner` has
-no intrinsic size (its width can be auto), so it takes explicit dimensions:
+`FluxSpinner` support the `Into<Text>` conversion and no-argument
+`to_lines()` / `to_text()`. `BarSpinner` has no intrinsic size (its width can
+be auto), so it takes explicit dimensions instead:
 `bar.to_lines(width, height)` / `bar.to_text(width, height)`.
 
 ---

@@ -90,9 +90,22 @@ macro_rules! render_spinner_body {
 
 // ── Embeddable text conversion ────────────────────────────────────────────────
 
-/// Implements `to_lines()` / `to_text()` for a spinner type, so its current
-/// frame can be embedded in other widgets that accept text content (e.g. a
-/// table `Cell` or a `Paragraph`).
+/// Implements `to_lines()` / `to_text()` **and** `From<Spinner> for Text` for a
+/// spinner type, so its current frame can be embedded in any widget that
+/// accepts `Into<Text>` content.
+///
+/// Because `ratatui`'s `Cell` and `Paragraph::new` accept `Into<Text>`, the
+/// generated `From` impls make the following all work with no special method:
+///
+/// ```text
+/// Cell::from(&spinner)        // by reference
+/// Cell::from(spinner)         // by value
+/// Paragraph::new(&spinner)
+/// let text: Text = spinner.into();
+/// ```
+///
+/// `to_lines()` remains available for the case where the spinner rows need to
+/// be combined with other lines in the same cell.
 ///
 /// `$builder` is the private method that produces the `Vec<Line>` for the
 /// current frame (typically `build_lines` or `render_lines`).
@@ -106,21 +119,33 @@ macro_rules! impl_to_text {
             /// Renders the current frame as a `Vec<Line>`, one
             /// [`Line`](ratatui::text::Line) per row.
             ///
-            /// Exposed so the spinner can be embedded in other widgets that
-            /// accept lines or text, such as a table
-            /// [`Cell`](ratatui::widgets::Cell) or a
-            /// [`Paragraph`](ratatui::widgets::Paragraph).
+            /// Use this when the spinner rows need to be combined with other
+            /// lines in the same cell. To embed the whole spinner on its own,
+            /// prefer the `Into<Text>` conversion (e.g. `Cell::from(&spinner)`).
             #[must_use]
             pub fn to_lines(&self) -> Vec<ratatui::text::Line<'static>> {
                 self.$builder()
             }
 
             /// Renders the current frame as a
-            /// [`Text`](ratatui::text::Text) value for embedding in widgets
-            /// whose content is a `Text`.
+            /// [`Text`](ratatui::text::Text) value.
+            ///
+            /// Equivalent to `Text::from(&spinner)`; kept for discoverability.
             #[must_use]
             pub fn to_text(&self) -> ratatui::text::Text<'static> {
                 ratatui::text::Text::from(self.$builder())
+            }
+        }
+
+        impl From<&$t> for ratatui::text::Text<'static> {
+            fn from(spinner: &$t) -> Self {
+                ratatui::text::Text::from(spinner.$builder())
+            }
+        }
+
+        impl From<$t> for ratatui::text::Text<'static> {
+            fn from(spinner: $t) -> Self {
+                ratatui::text::Text::from(spinner.$builder())
             }
         }
     };

@@ -263,15 +263,14 @@ impl FluxFrames {
 ///
 /// ## Embedding in another widget
 ///
-/// Use [`to_lines`](FluxSpinner::to_lines) or
-/// [`to_text`](FluxSpinner::to_text) to drop the current frame into any widget
-/// that accepts text content, such as a table
-/// [`Cell`](ratatui::widgets::Cell):
+/// Because the spinner implements `Into<Text>`, it can be dropped straight
+/// into any widget that accepts text content — such as a table
+/// [`Cell`](ratatui::widgets::Cell) or a
+/// [`Paragraph`](ratatui::widgets::Paragraph) — with no special method:
 ///
 /// ```
 /// use ratatui::style::Color;
-/// use ratatui::text::Line;
-/// use ratatui::widgets::Cell;
+/// use ratatui::widgets::{Cell, Paragraph};
 /// use tui_spinner::{FluxSpinner, Spin};
 ///
 /// let spinner = FluxSpinner::new(3)
@@ -279,12 +278,24 @@ impl FluxFrames {
 ///     .spin(Spin::CounterClockwise)
 ///     .color(Color::Cyan);
 ///
+/// // By reference …
+/// let _cell = Cell::from(&spinner);
+/// // … or by value, or straight into a Paragraph
+/// let _para = Paragraph::new(FluxSpinner::new(0).width(8));
+/// ```
+///
+/// When you need to combine the spinner rows with other text in the same
+/// cell, use [`to_lines`](FluxSpinner::to_lines):
+///
+/// ```
+/// use ratatui::text::Line;
+/// use ratatui::widgets::Cell;
+/// use tui_spinner::FluxSpinner;
+///
+/// let spinner = FluxSpinner::new(3).width(12);
 /// let mut lines: Vec<Line> = vec![Line::from("The cell content")];
 /// lines.extend(spinner.to_lines());
 /// let _cell = Cell::from(lines);
-///
-/// // …or straight to Text
-/// let _cell = Cell::from(FluxSpinner::new(0).width(8).to_text());
 /// ```
 #[derive(Debug, Clone)]
 pub struct FluxSpinner<'a> {
@@ -896,5 +907,21 @@ mod tests {
     fn to_text_has_expected_row_count() {
         let s = FluxSpinner::new(0).width(4).height(3);
         assert_eq!(s.to_text().lines.len(), 3);
+    }
+
+    #[test]
+    fn converts_into_text_and_cell() {
+        use ratatui::text::Text;
+        use ratatui::widgets::Cell;
+
+        let s = FluxSpinner::new(2).width(5).height(2);
+        // From<&Spinner> and From<Spinner> for Text
+        let by_ref: Text = (&s).into();
+        let by_val: Text = s.clone().into();
+        assert_eq!(by_ref.lines.len(), 2);
+        assert_eq!(by_ref, by_val);
+        // Cell accepts anything Into<Text>
+        let _cell_ref = Cell::from(&s);
+        let _cell_val = Cell::from(s);
     }
 }
