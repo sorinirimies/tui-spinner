@@ -99,9 +99,19 @@ jobs:
     env:
       HAS_TOKEN: ${{ secrets.CRATES_IO_TOKEN != '' }}
     steps:
-      - name: Skip notice (no token)
+      - name: Guard — require CRATES_IO_TOKEN
         if: env.HAS_TOKEN != 'true'
-        run: echo "⏭️  CRATES_IO_TOKEN is not configured — skipping crates.io publish."
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          echo "::error title=crates.io publish skipped::CRATES_IO_TOKEN is not configured — tui-spinner@${VERSION} was NOT published to crates.io. Add the secret and re-run the Release workflow for this tag."
+          {
+            echo "### ❌ crates.io publish skipped";
+            echo "";
+            echo "\`CRATES_IO_TOKEN\` is not configured, so **tui-spinner@${VERSION}** was **not** published to crates.io.";
+            echo "";
+            echo "Fix: add the secret, then re-run the Release workflow for tag \`v${VERSION}\` (\`just release-retrigger ${VERSION}\`).";
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - uses: actions/checkout@v6
         if: env.HAS_TOKEN == 'true'
@@ -123,10 +133,25 @@ jobs:
         run: |
           VERSION="${{ needs.validate.outputs.version }}"
           echo "📦 Publishing tui-spinner@${VERSION} to crates.io…"
-          output=$(cargo publish 2>&1) && echo "$output" || {
+          if output=$(cargo publish 2>&1); then
             echo "$output"
-            echo "$output" | grep -q "already uploaded\|already exists" \
-              && echo "⏭️  Already published — skipping." \
-              || exit 1
-          }
+            {
+              echo "### ✅ Published to crates.io";
+              echo "";
+              echo "**tui-spinner@${VERSION}** is live: https://crates.io/crates/tui-spinner/${VERSION}";
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$output"
+            if echo "$output" | grep -q "already uploaded\|already exists"; then
+              echo "::warning title=crates.io publish::tui-spinner@${VERSION} was already published — nothing to do."
+              {
+                echo "### ℹ️ crates.io publish skipped (already published)";
+                echo "";
+                echo "**tui-spinner@${VERSION}** was already on crates.io.";
+              } >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error title=crates.io publish failed::cargo publish failed for tui-spinner@${VERSION}."
+              exit 1
+            fi
+          fi
           echo "✅ Publish step complete."
