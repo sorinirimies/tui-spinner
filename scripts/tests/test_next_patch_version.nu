@@ -95,6 +95,7 @@ def main [] {
                 assert_str_contains $src "PATCH + 1" --msg "should increment the patch segment"
                 assert_str_contains $src "bump_version.nu --yes" --msg "should invoke bump_version.nu non-interactively"
                 assert_str_contains $src "git push origin main --follow-tags" --msg "should push the commit and tag to trigger release.yml"
+                assert_str_contains $src "gh workflow run release.yml" --msg "should explicitly dispatch release.yml since GITHUB_TOKEN pushes don't trigger workflows"
             }
         },
         {
@@ -105,6 +106,7 @@ def main [] {
                 assert_str_contains $src "PATCH + 1" --msg "should increment the patch segment"
                 assert_str_contains $src "bump_version.nu --yes" --msg "should invoke bump_version.nu non-interactively"
                 assert_str_contains $src "git push origin main --follow-tags" --msg "should push the commit and tag to trigger release.yml"
+                assert_str_contains $src "actions/workflows/release.yml/dispatches" --msg "should explicitly dispatch release.yml as a fallback trigger"
             }
         },
         {

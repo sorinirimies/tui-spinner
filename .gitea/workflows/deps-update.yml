@@ -118,6 +118,20 @@ jobs:
           git push origin main --follow-tags
           echo "✅ Dependency updates + version bump pushed to main."
 
+      # Some Gitea versions also skip triggering workflows for pushes authored
+      # by the built-in actions token. Explicitly dispatch release.yml via the
+      # API as a belt-and-braces guarantee that it always fires.
+      - name: Trigger release workflow for the new tag
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          TAG="v${{ steps.nextver.outputs.next }}"
+          echo "🚀 Dispatching release.yml for ${TAG}…"
+          curl -sf -X POST \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"ref\": \"main\", \"inputs\": {\"tag\": \"${TAG}\"}}"
+
       - name: Nothing to update
         if: steps.check.outputs.has_changes == 'false'
         run: echo "✅ All dependencies already up to date — nothing to upgrade."

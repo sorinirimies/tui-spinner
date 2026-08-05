@@ -25,6 +25,7 @@ env:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   deps-update:
@@ -121,5 +122,18 @@ jobs:
       - name: Push commit and tag
         if: steps.changes.outputs.changed == 'true'
         run: git push origin main --follow-tags
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      # Pushes authored by GITHUB_TOKEN do NOT trigger other workflows (GitHub's
+      # anti-recursion guard), so unless GH_PAT is set the vX.Y.Z tag push above
+      # will silently NOT start release.yml. Explicitly dispatch it instead —
+      # workflow_dispatch via the API is exempt from that restriction.
+      - name: Trigger release workflow for the new tag
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          TAG="v${{ steps.nextver.outputs.next }}"
+          echo "🚀 Dispatching release.yml for ${TAG}…"
+          gh workflow run release.yml --repo "${{ github.repository }}" -f tag="${TAG}"
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
