@@ -9,6 +9,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+
 concurrency:
   group: deps-update
   cancel-in-progress: true
@@ -36,6 +39,12 @@ jobs:
       # ── cargo-edit (provides `cargo upgrade`) ────────────────────────────────
       - name: Install cargo-edit
         run: cargo install cargo-edit --locked
+
+      - name: Install git-cliff
+        run: cargo install git-cliff --locked
+
+      - name: Install Nushell
+        run: cargo install nu --locked
 
       # ── Pre-warm cargo registry ──────────────────────────────────────────────
       # `cargo upgrade`'s resolver can fail if previously-cached package versions
@@ -81,20 +90,33 @@ jobs:
         if: steps.check.outputs.has_changes == 'true'
         run: cargo test --all-features
 
-      # ── Commit and push directly to main ─────────────────────────────────────
-      - name: Commit and push dependency updates
+      # ── Bump version, commit, tag and push ───────────────────────────────────
+      # Pushing the resulting vX.Y.Z tag triggers release.yml automatically.
+      - name: Compute next patch version
+        if: steps.check.outputs.has_changes == 'true'
+        id: nextver
+        run: |
+          CURRENT=$(nu scripts/version.nu)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "next=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "📈 Version bump: ${CURRENT} → ${NEXT}"
+
+      - name: Configure git identity
         if: steps.check.outputs.has_changes == 'true'
         run: |
-          DATE=$(date -u '+%Y-%m-%d')
-
           git config user.name  "gitea-actions[bot]"
           git config user.email "gitea-actions[bot]@noreply.gitea"
 
-          git add Cargo.toml Cargo.lock
-          git commit -m "chore(deps): nightly dependency upgrade $DATE"
-          git push origin main
+      - name: Bump version, commit and tag
+        if: steps.check.outputs.has_changes == 'true'
+        run: nu scripts/bump_version.nu --yes ${{ steps.nextver.outputs.next }}
 
-          echo "✅ Dependency updates pushed to main."
+      - name: Push commit and tag to main
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git push origin main --follow-tags
+          echo "✅ Dependency updates + version bump pushed to main."
 
       - name: Nothing to update
         if: steps.check.outputs.has_changes == 'false'
