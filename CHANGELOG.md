@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.1 - 2026-08-05
+### 📚 Documentation
+- docs: apply consistent flat-square styling to README badges
+### 🔄 CI
+- ci: fail the release loudly when crates.io publish is skipped
+- ci(deps-update): auto-bump patch version + tag to trigger release
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.0...v0.4.1
 ## 0.4.0 - 2026-07-10
 ### ✨ Features
 - feat(spinner): implement Into<Text> so spinners embed with no special method
@@ -10,6 +17,8 @@ All notable changes to this project will be documented in this file.
 ### 🔄 CI
 - ci: install Nushell via prebuilt hustcer/setup-nu instead of building from source
 - ci: install git-cliff via prebuilt taiki-e/install-action on GitHub
+### 🔧 Chores
+- chore: bump version to 0.4.0
 **Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.3.0...v0.4.0
 ## 0.3.0 - 2026-07-10
 ### ♻️ Refactor
