@@ -2,12 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.2 - 2026-08-08
+### 🔄 CI
+- ci(deps-update): explicitly dispatch release.yml (GITHUB_TOKEN pushes don't trigger workflows)
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.1...v0.4.2
 ## 0.4.1 - 2026-08-05
 ### 📚 Documentation
 - docs: apply consistent flat-square styling to README badges
 ### 🔄 CI
 - ci: fail the release loudly when crates.io publish is skipped
 - ci(deps-update): auto-bump patch version + tag to trigger release
+### 🔧 Chores
+- chore: bump version to 0.4.1
 **Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.0...v0.4.1
 ## 0.4.0 - 2026-07-10
 ### ✨ Features
