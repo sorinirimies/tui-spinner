@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.8 - 2026-08-21
+### 📦 Other Changes
+- justfile: add gitea-nexus-lab remote recipes (push/pull/sync/release)
+- justfile: rename gitea -> gitea-microlab; add full gitea-microlab/-starscream/-nexus-lab parity
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.7...v0.4.8
+## 0.4.7 - 2026-08-15
+### 🔧 Chores
+- chore: bump version to 0.4.7
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.6...v0.4.7
 ## 0.4.6 - 2026-08-14
 ### 🔧 Chores
 - chore: bump version to 0.4.6
