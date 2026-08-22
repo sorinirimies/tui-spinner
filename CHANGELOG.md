@@ -2,24 +2,67 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.4.8 - 2026-08-21
+## 0.4.9 - 2026-08-22
+### 📚 Documentation
+- docs: bump README install version pin to 0.4
+### 📦 Other Changes
+- justfile: add gitea-nexus-lab remote recipes (push/pull/sync/release)
+- justfile: rename gitea -> gitea-microlab; add full gitea-microlab/-starscream/-nexus-lab parity
+- Add/complete nightly dependency-update automation (Gitea): update deps, quality-gate, bump patch version, tag, push to Gitea + GitHub
+### 🔧 Chores
+- chore: bump version to 0.4.8
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.7...v0.4.9
+## 0.4.7 - 2026-08-15
+### 🔧 Chores
+- chore: bump version to 0.4.7
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.6...v0.4.7
+## 0.4.6 - 2026-08-14
+### 🔧 Chores
+- chore: bump version to 0.4.6
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.5...v0.4.6
+## 0.4.5 - 2026-08-12
+### 🔧 Chores
+- chore: bump version to 0.4.5
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.4...v0.4.5
+## 0.4.4 - 2026-08-10
+### 🔧 Chores
+- chore: bump version to 0.4.4
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.3...v0.4.4
+## 0.4.3 - 2026-08-09
+### 🔧 Chores
+- chore: bump version to 0.4.3
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.2...v0.4.3
+## 0.4.2 - 2026-08-08
+### 🔄 CI
+- ci(deps-update): explicitly dispatch release.yml (GITHUB_TOKEN pushes don't trigger workflows)
+### 🔧 Chores
+- chore: bump version to 0.4.2
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.1...v0.4.2
+## 0.4.1 - 2026-08-05
+### 📚 Documentation
+- docs: apply consistent flat-square styling to README badges
+### 🔄 CI
+- ci: fail the release loudly when crates.io publish is skipped
+- ci(deps-update): auto-bump patch version + tag to trigger release
+### 🔧 Chores
+- chore: bump version to 0.4.1
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.0...v0.4.1
+## 0.4.0 - 2026-07-10
+### ✨ Features
+- feat(spinner): implement Into<Text> so spinners embed with no special method
+### 📚 Documentation
+- docs(examples): add table_embed demo for spinners in Table cells
+### 🔄 CI
+- ci: install Nushell via prebuilt hustcer/setup-nu instead of building from source
+- ci: install git-cliff via prebuilt taiki-e/install-action on GitHub
+### 🔧 Chores
+- chore: bump version to 0.4.0
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.3.0...v0.4.0
+## 0.3.0 - 2026-07-10
 ### ♻️ Refactor
-- Refactor Square spinner: simplify, remove Narrow, update styles
-- refactor: rename ZedSpinner -> DotSpinner; add Spin direction
-- refactor: rename DotSpinner -> FluxSpinner; simplify example
-- refactor: clean example — macros, unified Tile, no glyph row, Length(4) cells
 - refactor: shared macros + BarSpinner::with_colors + new edge-case tests
 - refactor: collapse bar_spinner to single page — 16 styles, no duplicates
 ### ✨ Features
-- feat: add RectangularSpinner — Zed/Claude-style bouncing braille arc
-- feat: add ZedSpinner; rename RectangularSpinner → BarSpinner
-- feat: FluxFrames presets + .frames() builder; reorganise example
-- feat: add 5 new FluxFrames presets; rebuild example around preset/direction story
-- feat: replace ARROWS with BOUNCE/HALF/SQUARE/DICE; 4×4 grid with live custom tiles
-- feat: 5×4 compact grid; add BAR/CORNERS presets + SHADE/MUSIC custom tiles
-- feat: split spinner.rs into 3 focused examples; add 5 FluxFrames presets; 4-row grid
-- feat: BarSpinner — BarTrack + fade_width; Hide compile in all VHS tapes
-- feat: BarSpinner arc_char + presets; 3-page example with ← → navigation
 - feat: BarStyle enum (Block/Shade/Dot/Diamond/Square); example sections
 - feat: 4 more BarStyles (Progress/Thick/Wave/Pip) from tui-slider symbols; 4x4 grid
 - feat: BarMotion::Loop — continuous sweep mode for BarSpinner
@@ -27,17 +70,9 @@ All notable changes to this project will be documented in this file.
 - feat: vertical page uses same 4x4 cell grid as horizontal; regenerate all GIFs
 - feat: add Squeeze, Radiate motions, thickness API, and per-spinner labels
 - feat(spinner): add to_lines()/to_text() to embed spinners in other widgets
-- feat(spinner): implement Into<Text> so spinners embed with no special method
 ### ➕ Added
-- Add Gitea workflows, scripts, and Nushell test suite
 - Add CI scripts for quality gate, release notes, and tag validation
 ### 🐛 Bug Fixes
-- fix: resolve all clippy warnings; add gitea/gitea_starscream remotes; update nightly dep workflow
-- fix: redesign RectangularSpinner as solid bouncing bar (true Zed/Claude style)
-- fix: replace row list with 4×3 grid in flux_spinner example
-- fix: vertically centre circle_spinner rows; sync justfile with gitkraft
-- fix: release-* recipes must call (bump version) not bare bump
-- fix: open CHANGELOG.md with --raw in release_prepare.nu
 - fix: bar_spinner example — 1 CW + 1 CCW per concept, distinct patterns
 - fix: BarMotion::Loop — modular phase-in/out at both edges simultaneously
 - fix: Bounce vs Loop shown as single CW bars so motion difference is obvious
@@ -51,29 +86,12 @@ All notable changes to this project will be documented in this file.
 - fix: upgrade ratatui to 0.30, add downgrade rejection to dep-update workflows
 - fix: merge identical match arms to satisfy clippy::match_same_arms
 ### 📚 Documentation
-- docs: add VHS tapes + GIFs for all 5 examples; rewrite README with previews
 - docs: regenerate bar-spinner-demo.gif and spinner-demo.gif
 - docs: update README for 0.2.x
 - docs: remove CI badge; add .zed/rules.md with agent best practices
 - docs: add crates.io downloads badge to README
 - docs: move combined overview GIF to first preview; fix BarSpinner heading
-- docs(examples): add table_embed demo for spinners in Table cells
-- docs: apply consistent flat-square styling to README badges
-### 📦 Other Changes
-- Initial commit
-- square, narrow, circle and linear spinner implementation
-- justfile: add gitea-nexus-lab remote recipes (push/pull/sync/release)
-- justfile: rename gitea -> gitea-microlab; add full gitea-microlab/-starscream/-nexus-lab parity
-### 🔄 CI
-- ci: install Nushell via prebuilt hustcer/setup-nu instead of building from source
-- ci: install git-cliff via prebuilt taiki-e/install-action on GitHub
-- ci: fail the release loudly when crates.io publish is skipped
-- ci(deps-update): auto-bump patch version + tag to trigger release
-- ci(deps-update): explicitly dispatch release.yml (GITHUB_TOKEN pushes don't trigger workflows)
 ### 🔧 Chores
-- chore: remove stray disktest.txt
-- chore: bump version to 0.1.1
-- chore: bump version to 0.1.2
 - chore(deps): nightly dependency upgrade 2026-04-28
 - chore: bump version to 0.2.0
 - chore: fix example warnings for 0.2.0 release
@@ -90,11 +108,43 @@ All notable changes to this project will be documented in this file.
 - chore: use compatible-only cargo upgrade to prevent downgrades
 - chore(deps): upgrade ratatui to 0.30 and refresh Cargo.lock
 - chore: bump version to 0.3.0
-- chore: bump version to 0.4.0
-- chore: bump version to 0.4.1
-- chore: bump version to 0.4.2
-- chore: bump version to 0.4.3
-- chore: bump version to 0.4.4
-- chore: bump version to 0.4.5
-- chore: bump version to 0.4.6
-- chore: bump version to 0.4.7
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.1.2...v0.3.0
+## 0.1.2 - 2026-04-28
+### ✨ Features
+- feat: BarSpinner — BarTrack + fade_width; Hide compile in all VHS tapes
+- feat: BarSpinner arc_char + presets; 3-page example with ← → navigation
+### 🐛 Bug Fixes
+- fix: open CHANGELOG.md with --raw in release_prepare.nu
+### 🔧 Chores
+- chore: bump version to 0.1.2
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.1.1...v0.1.2
+## 0.1.1 - 2026-04-28
+### ♻️ Refactor
+- Refactor Square spinner: simplify, remove Narrow, update styles
+- refactor: rename ZedSpinner -> DotSpinner; add Spin direction
+- refactor: rename DotSpinner -> FluxSpinner; simplify example
+- refactor: clean example — macros, unified Tile, no glyph row, Length(4) cells
+### ✨ Features
+- feat: add RectangularSpinner — Zed/Claude-style bouncing braille arc
+- feat: add ZedSpinner; rename RectangularSpinner → BarSpinner
+- feat: FluxFrames presets + .frames() builder; reorganise example
+- feat: add 5 new FluxFrames presets; rebuild example around preset/direction story
+- feat: replace ARROWS with BOUNCE/HALF/SQUARE/DICE; 4×4 grid with live custom tiles
+- feat: 5×4 compact grid; add BAR/CORNERS presets + SHADE/MUSIC custom tiles
+- feat: split spinner.rs into 3 focused examples; add 5 FluxFrames presets; 4-row grid
+### ➕ Added
+- Add Gitea workflows, scripts, and Nushell test suite
+### 🐛 Bug Fixes
+- fix: resolve all clippy warnings; add gitea/gitea_starscream remotes; update nightly dep workflow
+- fix: redesign RectangularSpinner as solid bouncing bar (true Zed/Claude style)
+- fix: replace row list with 4×3 grid in flux_spinner example
+- fix: vertically centre circle_spinner rows; sync justfile with gitkraft
+- fix: release-* recipes must call (bump version) not bare bump
+### 📚 Documentation
+- docs: add VHS tapes + GIFs for all 5 examples; rewrite README with previews
+### 📦 Other Changes
+- Initial commit
+- square, narrow, circle and linear spinner implementation
+### 🔧 Chores
+- chore: remove stray disktest.txt
+- chore: bump version to 0.1.1

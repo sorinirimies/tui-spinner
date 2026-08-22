@@ -1585,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "tui-spinner"
-version = "0.4.8"
+version = "0.4.9"
 dependencies = [
  "color-eyre",
  "crossterm",
