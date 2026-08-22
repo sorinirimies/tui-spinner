@@ -54,7 +54,7 @@ Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) T
 
 ```toml
 [dependencies]
-tui-spinner = "0.2"
+tui-spinner = "0.4"
 ```
 
 ---
