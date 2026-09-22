@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.22 - 2026-09-19
+### 🔧 Chores
+- chore: bump version to 0.4.22
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.21...v0.4.22
 ## 0.4.21 - 2026-09-17
 ### 🐛 Bug Fixes
 - fix(ci): gate deps-update has_changes on Cargo.lock only
