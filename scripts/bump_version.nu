@@ -36,9 +36,9 @@ def main [
     # ── confirmation ─────────────────────────────────────────────────
     if not $yes {
         let answer = (input $"($yellow)proceed with bump? \(y/N\):($reset) ")
-        if ($answer | str downcase) != "y" {
+        if not (($answer | str trim) =~ '(?i)^y$') {
             print $"($yellow)aborted.($reset)"
-            exit 0
+            exit 1
         }
     }
 
