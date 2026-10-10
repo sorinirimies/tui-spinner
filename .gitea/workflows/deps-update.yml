@@ -60,7 +60,9 @@ jobs:
       # backwards.  This respects existing semver constraints in Cargo.toml and
       # only bumps within the allowed range.
       - name: Upgrade workspace dependency pins
-        run: cargo upgrade
+        run: |
+          cargo metadata --no-deps --format-version 1 | jq -S -c '[.packages[].dependencies[] | {name,req,kind,features,optional,target,uses_default_features}] | sort_by(.name,.kind)' > "$RUNNER_TEMP/deps_before.json"
+          cargo upgrade
 
       - name: Sync Cargo.lock
         run: cargo update
@@ -74,7 +76,14 @@ jobs:
       - name: Check for changes
         id: check
         run: |
-          if git diff --quiet Cargo.lock; then
+          cargo metadata --no-deps --format-version 1 | jq -S -c '[.packages[].dependencies[] | {name,req,kind,features,optional,target,uses_default_features}] | sort_by(.name,.kind)' > "$RUNNER_TEMP/deps_after.json"
+          if cmp -s "$RUNNER_TEMP/deps_before.json" "$RUNNER_TEMP/deps_after.json"; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "📦 Cargo.toml dependency requirements changed → patch release."
+          fi
+          if git diff --quiet Cargo.lock && [ "$(cmp -s "$RUNNER_TEMP/deps_before.json" "$RUNNER_TEMP/deps_after.json"; echo $?)" = 0 ]; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             echo "ℹ️  No dependency changes detected."
           else
@@ -99,7 +108,7 @@ jobs:
       # ── Bump version, commit, tag and push ───────────────────────────────────
       # Pushing the resulting vX.Y.Z tag triggers release.yml automatically.
       - name: Compute next patch version
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.release == 'true'
         id: nextver
         run: |
           CURRENT=$(nu scripts/version.nu)
@@ -115,8 +124,17 @@ jobs:
           git config user.email "gitea-actions[bot]@noreply.gitea"
 
       - name: Bump version, commit and tag
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.release == 'true'
         run: nu scripts/bump_version.nu --yes ${{ steps.nextver.outputs.next }}
+
+      # Lock-only change: keep main current but do NOT bump/tag/release.
+      # Discard any cosmetic Cargo.toml reserialization from `cargo upgrade`.
+      - name: Commit lock-only update
+        if: steps.check.outputs.has_changes == 'true' && steps.check.outputs.release != 'true'
+        run: |
+          git checkout -- Cargo.toml
+          git add Cargo.lock
+          git commit -m "chore(deps): update Cargo.lock"
 
       - name: Push commit and tag to main
         if: steps.check.outputs.has_changes == 'true'
@@ -137,7 +155,7 @@ jobs:
       # by the built-in actions token. Explicitly dispatch release.yml via the
       # API as a belt-and-braces guarantee that it always fires.
       - name: Trigger release workflow for the new tag
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.release == 'true'
         run: |
           TAG="v${{ steps.nextver.outputs.next }}"
           echo "🚀 Dispatching release.yml for ${TAG}…"

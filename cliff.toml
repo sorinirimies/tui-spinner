@@ -28,6 +28,8 @@ trim = true
 [git]
 conventional_commits = false
 commit_parsers = [
+    # Lock-only dependency refreshes never appear in the changelog
+    { message = "^chore\\(deps\\): update Cargo\\.lock", skip = true },
     { message = "^[Ff]eat(?:\\(.*\\))?:?\\s", group = "✨ Features" },
     { message = "^[Ff]ix(?:\\(.*\\))?:?\\s", group = "🐛 Bug Fixes" },
     { message = "^[Dd]ocs(?:\\(.*\\))?:?\\s", group = "📚 Documentation" },
