@@ -365,6 +365,7 @@ pub struct CircleSpinner<'a> {
     dim_color: Color,
     block: Option<Block<'a>>,
     style: Style,
+    theme_set: u8,
     alignment: Alignment,
 }
 
@@ -391,6 +392,7 @@ impl<'a> CircleSpinner<'a> {
             dim_color: Color::DarkGray,
             block: None,
             style: Style::default(),
+            theme_set: 0,
             alignment: Alignment::Left,
         }
     }
@@ -452,6 +454,7 @@ impl<'a> CircleSpinner<'a> {
     /// ```
     #[must_use]
     pub const fn arc_color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C1;
         self.arc_color = color;
         self
     }
@@ -468,6 +471,7 @@ impl<'a> CircleSpinner<'a> {
     /// ```
     #[must_use]
     pub const fn dim_color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C2;
         self.dim_color = color;
         self
     }
@@ -482,6 +486,7 @@ impl<'a> CircleSpinner<'a> {
     /// Sets the base style for the widget area.
     #[must_use]
     pub fn style<S: Into<Style>>(mut self, style: S) -> Self {
+        self.theme_set |= crate::THEME_STYLE;
         self.style = style.into();
         self
     }
@@ -529,6 +534,8 @@ impl<'a> CircleSpinner<'a> {
 }
 
 impl_styled_for!(CircleSpinner<'_>);
+
+impl_themed!(CircleSpinner<'_>, arc_color => accent, dim_color => disabled);
 
 impl_to_text!(CircleSpinner<'_>, build_lines);
 

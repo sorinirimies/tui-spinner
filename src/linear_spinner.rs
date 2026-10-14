@@ -248,6 +248,7 @@ pub struct LinearSpinner<'a> {
     block: Option<Block<'a>>,
     /// Base style.
     style: Style,
+    theme_set: u8,
 }
 
 impl<'a> LinearSpinner<'a> {
@@ -275,6 +276,7 @@ impl<'a> LinearSpinner<'a> {
             inactive_color: Color::DarkGray,
             block: None,
             style: Style::default(),
+            theme_set: 0,
         }
     }
 
@@ -397,6 +399,7 @@ impl<'a> LinearSpinner<'a> {
     /// ```
     #[must_use]
     pub const fn active_color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C1;
         self.active_color = color;
         self
     }
@@ -413,6 +416,7 @@ impl<'a> LinearSpinner<'a> {
     /// ```
     #[must_use]
     pub const fn inactive_color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C2;
         self.inactive_color = color;
         self
     }
@@ -436,6 +440,7 @@ impl<'a> LinearSpinner<'a> {
     /// Sets the base style applied to the widget area.
     #[must_use]
     pub fn style<S: Into<Style>>(mut self, style: S) -> Self {
+        self.theme_set |= crate::THEME_STYLE;
         self.style = style.into();
         self
     }
@@ -557,6 +562,8 @@ impl<'a> LinearSpinner<'a> {
 // ── Styled ────────────────────────────────────────────────────────────────────
 
 impl_styled_for!(LinearSpinner<'_>);
+
+impl_themed!(LinearSpinner<'_>, active_color => accent, inactive_color => disabled);
 
 impl_to_text!(LinearSpinner<'_>, build_lines);
 

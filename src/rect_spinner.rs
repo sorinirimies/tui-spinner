@@ -423,6 +423,7 @@ pub struct RectSpinner<'a> {
     centre: Centre,
     block: Option<Block<'a>>,
     style: Style,
+    theme_set: u8,
     alignment: Alignment,
 }
 
@@ -440,6 +441,7 @@ impl<'a> RectSpinner<'a> {
             centre: Centre::default(),
             block: None,
             style: Style::default(),
+            theme_set: 0,
             alignment: Alignment::Left,
         }
     }
@@ -461,6 +463,7 @@ impl<'a> RectSpinner<'a> {
     /// Sets the outer arc color.
     #[must_use]
     pub const fn outer_color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C1;
         self.outer_color = color;
         self
     }
@@ -468,6 +471,7 @@ impl<'a> RectSpinner<'a> {
     /// Sets the inner centre color.
     #[must_use]
     pub const fn inner_color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C2;
         self.inner_color = color;
         self
     }
@@ -496,6 +500,7 @@ impl<'a> RectSpinner<'a> {
     /// Sets the base style.
     #[must_use]
     pub fn style<S: Into<Style>>(mut self, style: S) -> Self {
+        self.theme_set |= crate::THEME_STYLE;
         self.style = style.into();
         self
     }
@@ -530,6 +535,8 @@ impl<'a> RectSpinner<'a> {
 }
 
 impl_styled_for!(RectSpinner<'_>);
+
+impl_themed!(RectSpinner<'_>, outer_color => accent, inner_color => disabled);
 
 impl_to_text!(RectSpinner<'_>, render_lines);
 

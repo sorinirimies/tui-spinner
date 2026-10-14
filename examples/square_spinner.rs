@@ -10,7 +10,7 @@
 //! | **Filled** | sizes 2 · 3 · 4 | sizes 2 · 3 · 4 |
 //! | **Empty**  | sizes 2 · 3 · 4 | sizes 2 · 3 · 4 |
 //!
-//! **Controls:** `q` / `Esc` — Quit
+//! **Controls:** `t` / `T` — Next / previous theme · `q` / `Esc` — Quit
 //!
 //! Run with: `cargo run --example square_spinner`
 
@@ -81,6 +81,7 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
         terminal.draw(|f| render(f, app))?;
         if event::poll(Duration::from_millis(16))? {
             if let Event::Key(k) = event::read()? {
+                theme_key(k.code);
                 if matches!(k.code, KeyCode::Char('q') | KeyCode::Esc) {
                     break;
                 }
@@ -92,7 +93,7 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
-fn render(frame: &mut Frame, app: &App) {
+fn render_inner(frame: &mut Frame, app: &App) {
     let [header, body, footer] = Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(0),
@@ -248,6 +249,48 @@ fn render_quad(
                 .ticks_per_step(2 + sz as u64)
                 .alignment(Alignment::Center),
             area,
+        );
+    }
+}
+
+// ── Theme switching (t / T) ───────────────────────────────────────────────────
+
+static THEME_IDX: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+fn current_theme() -> tui_spinner::Theme {
+    let all = tui_spinner::Theme::all();
+    all[THEME_IDX.load(std::sync::atomic::Ordering::Relaxed) % all.len()].clone()
+}
+
+/// `t` = next theme, `T` = previous theme.
+fn theme_key(code: KeyCode) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let n = tui_spinner::Theme::all().len();
+    match code {
+        KeyCode::Char('t') => {
+            THEME_IDX.store((THEME_IDX.load(Relaxed) + 1) % n, Relaxed);
+        }
+        KeyCode::Char('T') => {
+            THEME_IDX.store((THEME_IDX.load(Relaxed) + n - 1) % n, Relaxed);
+        }
+        _ => {}
+    }
+}
+
+fn render(frame: &mut Frame, app: &App) {
+    let theme = current_theme();
+    let area = frame.area();
+    frame.render_widget(ratatui::widgets::Block::new().style(theme.style()), area);
+    render_inner(frame, app);
+    let label = format!(" t/T theme: {} ", theme.name);
+    let w = u16::try_from(label.chars().count())
+        .unwrap_or(0)
+        .min(area.width);
+    if area.height > 0 && w > 0 {
+        let r = Rect::new(area.right() - w, area.bottom() - 1, w, 1);
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(label).style(theme.title_style()),
+            r,
         );
     }
 }

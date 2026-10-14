@@ -25,6 +25,8 @@ exclude = [
 
 [dependencies]
 ratatui = { version = "0.30", default-features = false }
+# TODO: switch to the crates.io version after tui-nuances is published
+tui-nuances = { git = "https://github.com/sorinirimies/tui-nuances" }
 
 [dev-dependencies]
 color-eyre = "0.6"

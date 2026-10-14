@@ -20,6 +20,7 @@ macro_rules! impl_styled_for {
             }
 
             fn set_style<S: Into<ratatui::style::Style>>(mut self, style: S) -> Self {
+                self.theme_set |= crate::THEME_STYLE;
                 self.style = style.into();
                 self
             }
@@ -146,6 +147,50 @@ macro_rules! impl_to_text {
         impl From<$t> for ratatui::text::Text<'static> {
             fn from(spinner: $t) -> Self {
                 ratatui::text::Text::from(spinner.$builder())
+            }
+        }
+    };
+}
+
+// ── impl Themed ───────────────────────────────────────────────────────────────
+
+/// Implements `tui_nuances::Themed` and the inherent `.theme(&Theme)` builder.
+///
+/// Requires a `theme_set: u8` bitmask field plus `style` and the listed color
+/// fields. Fields explicitly set by the user (bit set in `theme_set`) are never
+/// overwritten by the theme, regardless of call order.
+///
+/// ```text
+/// impl_themed!(BarSpinner<'_>, arc_color => accent, dim_color => disabled);
+/// ```
+macro_rules! impl_themed {
+    ($t:ty, $c1:ident => $s1:ident $(, $c2:ident => $s2:ident)?) => {
+        impl tui_nuances::Themed for $t {
+            fn apply_theme(mut self, theme: &tui_nuances::Theme) -> Self {
+                if self.theme_set & crate::THEME_STYLE == 0 {
+                    self.style = theme.style();
+                }
+                if self.theme_set & crate::THEME_C1 == 0 {
+                    self.$c1 = theme.$s1;
+                }
+                $(
+                    if self.theme_set & crate::THEME_C2 == 0 {
+                        self.$c2 = theme.$s2;
+                    }
+                )?
+                self
+            }
+        }
+
+        impl $t {
+            /// Styles the spinner from a shared [`Theme`](tui_nuances::Theme).
+            ///
+            /// Colors and base style set explicitly (before **or** after this
+            /// call) always win over the theme. Without a theme the look is
+            /// unchanged.
+            #[must_use]
+            pub fn theme(self, theme: &tui_nuances::Theme) -> Self {
+                tui_nuances::Themed::apply_theme(self, theme)
             }
         }
     };

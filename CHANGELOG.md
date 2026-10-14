@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+### ✨ Features
+- feat: shared theming via tui-nuances (`.theme(&Theme)`, `Themed`, re-exported `Theme`)
+
 ## 0.4.33 - 2026-10-09
 ### 🔧 Chores
 - chore: bump version to 0.4.33

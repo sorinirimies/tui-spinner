@@ -743,6 +743,7 @@ pub struct BarSpinner<'a> {
     thickness: usize,
     block: Option<Block<'a>>,
     style: Style,
+    theme_set: u8,
     alignment: Alignment,
 }
 
@@ -839,6 +840,7 @@ impl<'a> BarSpinner<'a> {
             thickness: 0,
             block: None,
             style: Style::default(),
+            theme_set: 0,
             alignment: Alignment::Left,
         }
     }
@@ -939,6 +941,7 @@ impl<'a> BarSpinner<'a> {
     /// ```
     #[must_use]
     pub const fn arc_color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C1;
         self.arc_color = color;
         self
     }
@@ -961,6 +964,7 @@ impl<'a> BarSpinner<'a> {
     /// ```
     #[must_use]
     pub const fn dim_color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C2;
         self.dim_color = color;
         self
     }
@@ -979,7 +983,9 @@ impl<'a> BarSpinner<'a> {
     /// ```
     #[must_use]
     pub fn with_colors(mut self, arc_color: Color, dim_color: Color) -> Self {
+        self.theme_set |= crate::THEME_C1;
         self.arc_color = arc_color;
+        self.theme_set |= crate::THEME_C2;
         self.dim_color = dim_color;
         self
     }
@@ -1165,6 +1171,7 @@ impl<'a> BarSpinner<'a> {
     /// Sets the base style applied to the widget area.
     #[must_use]
     pub fn style<S: Into<Style>>(mut self, style: S) -> Self {
+        self.theme_set |= crate::THEME_STYLE;
         self.style = style.into();
         self
     }
@@ -1292,6 +1299,8 @@ impl<'a> BarSpinner<'a> {
 // ── Trait impls ───────────────────────────────────────────────────────────────
 
 impl_styled_for!(BarSpinner<'_>);
+
+impl_themed!(BarSpinner<'_>, arc_color => accent, dim_color => disabled);
 
 impl_widget_via_ref!(BarSpinner<'_>);
 

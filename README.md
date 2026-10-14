@@ -126,6 +126,28 @@ fn update(app: &mut App) {
 
 ---
 
+## Theming
+
+All widgets share one [`tui-nuances`](https://github.com/sorinirimies/tui-nuances) `Theme`
+(re-exported as `tui_spinner::Theme`). Theming is optional; without it the look is unchanged.
+
+```rust
+use tui_spinner::{BarSpinner, Theme, Themed};
+
+let theme = Theme::by_name("tokyo-night").unwrap_or_default();
+let bar = BarSpinner::new(tick).theme(&theme);          // inherent builder
+let same = BarSpinner::new(tick).apply_theme(&theme);   // via `Themed`
+```
+
+Mapping: active/arc/outer/flux color → `accent`; dim/inactive/inner color → `disabled`;
+base style → `theme.style()` (foreground + background).
+**Precedence:** colors/styles set explicitly (`arc_color`, `dim_color`, `with_colors`, `style`, …)
+always win over the theme, whether called before or after `.theme()`.
+
+Pass your app's theme by implementing `ThemeProvider` (or `From<&AppTheme> for Theme`) and
+calling `spinner.themed(&app_theme)`.
+Examples: press `t` / `T` to cycle through all built-in themes.
+
 ## Running the Examples
 
 ```sh

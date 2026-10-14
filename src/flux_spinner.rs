@@ -321,6 +321,7 @@ pub struct FluxSpinner<'a> {
     frames: &'static [char],
     block: Option<Block<'a>>,
     style: Style,
+    theme_set: u8,
     alignment: Alignment,
 }
 
@@ -348,6 +349,7 @@ impl<'a> FluxSpinner<'a> {
             frames: FluxFrames::BRAILLE,
             block: None,
             style: Style::default(),
+            theme_set: 0,
             alignment: Alignment::Left,
         }
     }
@@ -412,6 +414,7 @@ impl<'a> FluxSpinner<'a> {
     /// ```
     #[must_use]
     pub const fn color(mut self, color: Color) -> Self {
+        self.theme_set |= crate::THEME_C1;
         self.color = color;
         self
     }
@@ -496,6 +499,7 @@ impl<'a> FluxSpinner<'a> {
     /// Sets the base style applied to the widget area.
     #[must_use]
     pub fn style<S: Into<Style>>(mut self, style: S) -> Self {
+        self.theme_set |= crate::THEME_STYLE;
         self.style = style.into();
         self
     }
@@ -557,6 +561,8 @@ impl<'a> FluxSpinner<'a> {
 // ── Trait impls ───────────────────────────────────────────────────────────────
 
 impl_styled_for!(FluxSpinner<'_>);
+
+impl_themed!(FluxSpinner<'_>, color => accent);
 
 impl_to_text!(FluxSpinner<'_>, build_lines);
 

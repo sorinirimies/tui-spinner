@@ -66,6 +66,18 @@
 //!     .color(Color::LightBlue);
 //! ```
 //!
+//! ## Theming
+//!
+//! Every widget has an optional `.theme(&Theme)` builder (shared
+//! [`tui-nuances`](https://github.com/sorinirimies/tui-nuances) theme): active
+//! color → `accent`, dim/track color → `disabled`, base style → `theme.style()`.
+//! Explicit colors/styles win over the theme in any call order.
+//!
+//! ```no_run
+//! use tui_spinner::{BarSpinner, Theme};
+//! let bar = BarSpinner::new(0).theme(&Theme::nord());
+//! ```
+//!
 //! ## Integration
 //!
 //! All widgets are **stateless** — pass a monotonically-increasing `tick: u64`
@@ -108,5 +120,27 @@ pub use flux_spinner::{FluxFrames, FluxSpinner};
 pub use linear_spinner::{Direction, Flow, LinearSpinner, LinearStyle};
 pub use rect_spinner::{Centre, RectShape, RectSpinner, Spin};
 pub use square_spinner::SquareSpinner;
+pub use tui_nuances::{Status, Theme, ThemeProvider, ThemeSwitcher, Themed};
+
+// Bits of the per-widget `theme_set` mask: set when the user chose a value explicitly.
+pub(crate) const THEME_STYLE: u8 = 1;
+pub(crate) const THEME_C1: u8 = 2;
+pub(crate) const THEME_C2: u8 = 4;
 // Note: `Centre` and `Spin` are re-exported from rect_spinner.
 // `SquareSpinner` uses the same `Centre` and `Spin` enums via re-export.
+
+#[cfg(test)]
+mod theme_tests {
+    use super::*;
+    use ratatui::style::Color;
+
+    #[test]
+    fn mapping_all_widgets() {
+        let t = Theme::nord();
+        let a = RectSpinner::new(0).inner_color(Color::Red).theme(&t);
+        let b = RectSpinner::new(0).theme(&t).inner_color(Color::Red);
+        assert_eq!(a.to_lines(), b.to_lines());
+        let _ = LinearSpinner::new(0).theme(&t);
+        let _ = SquareSpinner::new(0).theme(&t);
+    }
+}
