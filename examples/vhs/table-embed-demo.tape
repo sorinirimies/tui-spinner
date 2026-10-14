@@ -10,10 +10,14 @@ Set FontSize 14
 Set PlaybackSpeed 1.0
 
 Hide
-Type "cargo run --example table_embed"
+Type "clear && cargo run --release --example table_embed"
 Enter
-Sleep 12s
+Sleep 5s
 Show
 Sleep 8s
+Type "t"
+Sleep 2s
+Type "T"
+Sleep 1s
 Type "q"
 Sleep 500ms

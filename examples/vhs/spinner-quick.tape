@@ -10,10 +10,14 @@ Set FontSize 14
 Set PlaybackSpeed 1.5
 
 Hide
-Type "cargo run --example spinner"
+Type "clear && cargo run --release --example spinner"
 Enter
-Sleep 12s
+Sleep 5s
 Show
 Sleep 5s
+Type "t"
+Sleep 2s
+Type "T"
+Sleep 1s
 Type "q"
 Sleep 500ms

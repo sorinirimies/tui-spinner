@@ -10,9 +10,9 @@ Set FontSize 14
 Set PlaybackSpeed 1.0
 
 Hide
-Type "cargo run --example bar_spinner"
+Type "clear && cargo run --release --example bar_spinner"
 Enter
-Sleep 12s
+Sleep 5s
 Show
 
 # Page 1: Horizontal bars (5 motions)
@@ -26,5 +26,9 @@ Sleep 7s
 Type "l"
 Sleep 7s
 
+Type "t"
+Sleep 2s
+Type "T"
+Sleep 1s
 Type "q"
 Sleep 500ms
