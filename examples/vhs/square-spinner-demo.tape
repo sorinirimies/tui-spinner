@@ -10,7 +10,7 @@ Set FontSize 14
 Set PlaybackSpeed 1.0
 
 Hide
-Type "clear && cargo run --release --example square_spinner"
+Type "clear && cargo run --release --features theme --example square_spinner"
 Enter
 Sleep 5s
 Show

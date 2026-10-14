@@ -1300,6 +1300,7 @@ impl<'a> BarSpinner<'a> {
 
 impl_styled_for!(BarSpinner<'_>);
 
+#[cfg(feature = "theme")]
 impl_themed!(BarSpinner<'_>, arc_color => accent, dim_color => disabled);
 
 impl_widget_via_ref!(BarSpinner<'_>);

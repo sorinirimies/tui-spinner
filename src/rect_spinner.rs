@@ -536,6 +536,7 @@ impl<'a> RectSpinner<'a> {
 
 impl_styled_for!(RectSpinner<'_>);
 
+#[cfg(feature = "theme")]
 impl_themed!(RectSpinner<'_>, outer_color => accent, inner_color => disabled);
 
 impl_to_text!(RectSpinner<'_>, render_lines);

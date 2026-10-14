@@ -50,7 +50,7 @@ build-release:
 
 # Run the main spinner demo example
 run:
-    cargo run --example spinner
+    cargo run --features theme --example spinner
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 

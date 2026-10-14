@@ -614,6 +614,7 @@ impl<'a> SquareSpinner<'a> {
 
 impl_styled_for!(SquareSpinner<'_>);
 
+#[cfg(feature = "theme")]
 impl_themed!(SquareSpinner<'_>, arc_color => accent, dim_color => disabled);
 
 impl_to_text!(SquareSpinner<'_>, build_lines);

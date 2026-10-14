@@ -535,6 +535,7 @@ impl<'a> CircleSpinner<'a> {
 
 impl_styled_for!(CircleSpinner<'_>);
 
+#[cfg(feature = "theme")]
 impl_themed!(CircleSpinner<'_>, arc_color => accent, dim_color => disabled);
 
 impl_to_text!(CircleSpinner<'_>, build_lines);

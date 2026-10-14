@@ -562,6 +562,7 @@ impl<'a> FluxSpinner<'a> {
 
 impl_styled_for!(FluxSpinner<'_>);
 
+#[cfg(feature = "theme")]
 impl_themed!(FluxSpinner<'_>, color => accent);
 
 impl_to_text!(FluxSpinner<'_>, build_lines);

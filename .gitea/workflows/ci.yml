@@ -58,6 +58,12 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-features -- -D warnings
 
+      - name: Run clippy (default features)
+        run: cargo clippy -- -D warnings
+
+      - name: Check (no default features)
+        run: cargo check --no-default-features
+
   # ── 3. Tests ─────────────────────────────────────────────────────────────────
   test:
     name: test
@@ -72,6 +78,9 @@ jobs:
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
+
+      - name: Run tests (default features)
+        run: cargo test
 
       - name: Run tests
         run: cargo test --all-features

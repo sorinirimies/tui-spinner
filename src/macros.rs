@@ -163,6 +163,7 @@ macro_rules! impl_to_text {
 /// ```text
 /// impl_themed!(BarSpinner<'_>, arc_color => accent, dim_color => disabled);
 /// ```
+#[cfg(feature = "theme")]
 macro_rules! impl_themed {
     ($t:ty, $c1:ident => $s1:ident $(, $c2:ident => $s2:ident)?) => {
         impl tui_nuances::Themed for $t {

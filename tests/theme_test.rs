@@ -1,3 +1,4 @@
+#![cfg(feature = "theme")]
 //! Integration tests for the shared `tui-nuances` theming API.
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Color, widgets::Widget};

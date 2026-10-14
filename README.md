@@ -7,6 +7,10 @@
 
 Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) TUI applications.
 
+## Features
+
+- `theme` (off by default) — shared `tui-nuances` theming: `.theme(&Theme)` builders, `Themed` impls, `Theme` re-exports.
+
 ---
 
 ## Widgets
@@ -129,7 +133,12 @@ fn update(app: &mut App) {
 ## Theming
 
 All widgets share one [`tui-nuances`](https://github.com/sorinirimies/tui-nuances) `Theme`
-(re-exported as `tui_spinner::Theme`). Theming is optional; without it the look is unchanged.
+(re-exported as `tui_spinner::Theme`). Theming is **opt-in** behind the `theme` cargo feature
+(not enabled by default); without it the look is unchanged and `tui-nuances` is not compiled.
+
+```toml
+tui-spinner = { version = "0.4", features = ["theme"] }
+```
 
 ```rust
 use tui_spinner::{BarSpinner, Theme, Themed};
@@ -146,7 +155,7 @@ always win over the theme, whether called before or after `.theme()`.
 
 Pass your app's theme by implementing `ThemeProvider` (or `From<&AppTheme> for Theme`) and
 calling `spinner.themed(&app_theme)`.
-Examples: press `t` / `T` to cycle through all built-in themes.
+Examples: run with `--features theme`, then press `t` / `T` to cycle through all built-in themes.
 
 ## Running the Examples
 

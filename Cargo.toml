@@ -25,7 +25,12 @@ exclude = [
 
 [dependencies]
 ratatui = { version = "0.30", default-features = false }
-tui-nuances = { version = "0.1", git = "https://github.com/sorinirimies/tui-nuances" }
+tui-nuances = { version = "0.1", git = "https://github.com/sorinirimies/tui-nuances", optional = true }
+
+[features]
+default = []
+# Opt-in shared theming via tui-nuances (`.theme(&Theme)` builders).
+theme = ["dep:tui-nuances"]
 
 [dev-dependencies]
 color-eyre = "0.6"

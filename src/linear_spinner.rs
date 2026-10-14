@@ -563,6 +563,7 @@ impl<'a> LinearSpinner<'a> {
 
 impl_styled_for!(LinearSpinner<'_>);
 
+#[cfg(feature = "theme")]
 impl_themed!(LinearSpinner<'_>, active_color => accent, inactive_color => disabled);
 
 impl_to_text!(LinearSpinner<'_>, build_lines);

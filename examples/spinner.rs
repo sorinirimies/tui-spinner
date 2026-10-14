@@ -108,6 +108,7 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
 
         if event::poll(Duration::from_millis(16))? {
             if let Event::Key(key) = event::read()? {
+                #[cfg(feature = "theme")]
                 theme_key(key.code);
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => break,
@@ -535,14 +536,17 @@ fn render_horizontal_dots(frame: &mut Frame, area: Rect, tick: u64) {
 
 // ── Theme switching (t / T) ───────────────────────────────────────────────────
 
+#[cfg(feature = "theme")]
 static THEME_IDX: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
+#[cfg(feature = "theme")]
 fn current_theme() -> tui_spinner::Theme {
     let all = tui_spinner::Theme::all();
     all[THEME_IDX.load(std::sync::atomic::Ordering::Relaxed) % all.len()].clone()
 }
 
 /// `t` = next theme, `T` = previous theme.
+#[cfg(feature = "theme")]
 fn theme_key(code: KeyCode) {
     use std::sync::atomic::Ordering::Relaxed;
     let n = tui_spinner::Theme::all().len();
@@ -557,6 +561,7 @@ fn theme_key(code: KeyCode) {
     }
 }
 
+#[cfg(feature = "theme")]
 fn render(frame: &mut Frame, app: &App) {
     let theme = current_theme();
     let area = frame.area();
@@ -573,4 +578,9 @@ fn render(frame: &mut Frame, app: &App) {
             r,
         );
     }
+}
+
+#[cfg(not(feature = "theme"))]
+fn render(frame: &mut Frame, app: &App) {
+    render_inner(frame, app);
 }

@@ -10,7 +10,7 @@ Set FontSize 14
 Set PlaybackSpeed 1.0
 
 Hide
-Type "clear && cargo run --release --example table_embed"
+Type "clear && cargo run --release --features theme --example table_embed"
 Enter
 Sleep 5s
 Show
