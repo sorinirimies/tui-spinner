@@ -1,0 +1,47 @@
+[package]
+name = "tui-spinner-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+ratatui = { version = "0.30", default-features = false }
+tui-spinner = { path = ".." }
+
+# Not part of the main crate (needs nightly).
+[workspace]
+
+[[bin]]
+name = "render_bar"
+path = "fuzz_targets/render_bar.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "render_circle"
+path = "fuzz_targets/render_circle.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "render_flux"
+path = "fuzz_targets/render_flux.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "render_rect_square"
+path = "fuzz_targets/render_rect_square.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "render_linear"
+path = "fuzz_targets/render_linear.rs"
+test = false
+doc = false

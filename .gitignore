@@ -124,3 +124,8 @@ temp/
 
 # NOTE: generated GIFs in examples/vhs/generated/ are tracked via Git LFS
 # (see .gitattributes) — do NOT ignore them here.
+
+fuzz/target/
+fuzz/artifacts/
+fuzz/corpus/*
+fuzz/Cargo.lock

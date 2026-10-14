@@ -21,11 +21,12 @@ exclude = [
     "justfile",
     "examples/vhs/",
     "scripts/",
+    "fuzz/",
 ]
 
 [dependencies]
 ratatui = { version = "0.30", default-features = false }
-tui-nuances = { version = "0.1", git = "https://github.com/sorinirimies/tui-nuances", optional = true }
+tui-nuances = { version = "0.1.6", git = "https://github.com/sorinirimies/tui-nuances", optional = true }
 
 [features]
 default = []
