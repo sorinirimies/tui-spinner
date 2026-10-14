@@ -517,9 +517,17 @@ impl<'a> RectSpinner<'a> {
             RectShape::Square(size) => SquareEngine::build(size, self.centre, self.spin),
         };
 
-        let steps = self.tick / self.ticks_per_step;
-        for _ in 0..steps {
+        let mut steps = self.tick / self.ticks_per_step;
+        // Periodic animation: reduce steps modulo the period (O(period), not O(tick)).
+        let start = (engine.head.clone(), engine.tail.clone());
+        let mut done = 0u64;
+        while done < steps {
             engine.walk();
+            done += 1;
+            if engine.head == start.0 && engine.tail == start.1 {
+                steps %= done;
+                done = 0;
+            }
         }
 
         let mut lines = engine.render_frame(self.outer_color, self.inner_color);

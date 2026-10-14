@@ -98,6 +98,9 @@ use crate::Spin;
 /// ```
 pub struct FluxFrames;
 
+/// Upper bound for width/height in cells (guards against huge allocations).
+const MAX_DIM: usize = 512;
+
 impl FluxFrames {
     /// Full braille cell with one dot missing — the gap rotates clockwise.
     ///
@@ -365,7 +368,7 @@ impl<'a> FluxSpinner<'a> {
     /// ```
     #[must_use]
     pub fn width(mut self, w: usize) -> Self {
-        self.width = w.max(1);
+        self.width = w.clamp(1, MAX_DIM);
         self
     }
 
@@ -380,7 +383,7 @@ impl<'a> FluxSpinner<'a> {
     /// ```
     #[must_use]
     pub fn height(mut self, h: usize) -> Self {
-        self.height = h.max(1);
+        self.height = h.clamp(1, MAX_DIM);
         self
     }
 

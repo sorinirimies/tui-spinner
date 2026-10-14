@@ -18,6 +18,9 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Widget};
 
+/// Upper bound for slot counts (guards against huge allocations).
+const MAX_SLOTS: usize = 4096;
+
 // ── Direction ─────────────────────────────────────────────────────────────────
 
 /// The animation direction (and layout axis) of a [`LinearSpinner`].
@@ -346,7 +349,7 @@ impl<'a> LinearSpinner<'a> {
     /// ```
     #[must_use]
     pub fn total_slots(mut self, n: usize) -> Self {
-        self.total_slots = n.max(1);
+        self.total_slots = n.clamp(1, MAX_SLOTS);
         self
     }
 
@@ -365,7 +368,7 @@ impl<'a> LinearSpinner<'a> {
     /// ```
     #[must_use]
     pub fn lit_slots(mut self, n: usize) -> Self {
-        self.lit_slots = n.max(1);
+        self.lit_slots = n.clamp(1, MAX_SLOTS);
         self
     }
 

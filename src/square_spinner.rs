@@ -595,9 +595,18 @@ impl<'a> SquareSpinner<'a> {
         let mut engine = SquareEngine::build(self.size, self.centre);
 
         #[allow(clippy::cast_possible_truncation)]
-        let steps = (self.tick / self.ticks_per_step) as usize;
-        for _ in 0..steps {
+        let mut steps = (self.tick / self.ticks_per_step) as usize;
+        // The animation is periodic: once head/tail return to their start the
+        // remaining steps can be reduced modulo the period (avoids O(tick) work).
+        let start = (engine.head.clone(), engine.tail.clone());
+        let mut done = 0usize;
+        while done < steps {
             engine.walk();
+            done += 1;
+            if engine.head == start.0 && engine.tail == start.1 {
+                steps %= done;
+                done = 0;
+            }
         }
 
         let mut lines = engine.render_lines(self.arc_color, self.dim_color);

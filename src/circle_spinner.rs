@@ -64,6 +64,9 @@ impl Dot {
 
 // ── Perimeter ─────────────────────────────────────────────────────────────────
 
+/// Upper bound for the radius (guards against overflow / huge allocations).
+const MAX_RADIUS: usize = 512;
+
 /// Compute all dot positions on a circle perimeter using the midpoint circle
 /// algorithm at 1:1 dot pitch, then sort them clockwise from 12 o'clock.
 #[allow(clippy::cast_possible_wrap)]
@@ -408,7 +411,7 @@ impl<'a> CircleSpinner<'a> {
     /// ```
     #[must_use]
     pub fn radius(mut self, r: usize) -> Self {
-        self.radius = r.max(1);
+        self.radius = r.clamp(1, MAX_RADIUS);
         self
     }
 
@@ -524,7 +527,7 @@ impl<'a> CircleSpinner<'a> {
         let mut engine = CircleEngine::build(self.radius, self.arc_len, self.spin);
 
         #[allow(clippy::cast_possible_truncation)]
-        let steps = (self.tick / self.ticks_per_step) as usize;
+        let steps = (self.tick / self.ticks_per_step) as usize % engine.perimeter.len().max(1);
         for _ in 0..steps {
             engine.walk(self.spin);
         }

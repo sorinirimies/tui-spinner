@@ -283,6 +283,27 @@ fn fade_byte(from_edge: usize, fade_width: usize, arc_byte: u8) -> u8 {
     }
 }
 
+/// Upper bound for any dimension in cells (guards against huge allocations).
+const MAX_DIM: usize = 1024;
+
+/// Advance `$engine` by `$steps`, reducing modulo the animation period
+/// (the engine state repeats) so huge ticks cost O(period), not O(tick).
+macro_rules! walk_periodic {
+    ($engine:ident, $steps:ident) => {{
+        let mut left = $steps;
+        let start = ($engine.anchor, $engine.going_forward);
+        let mut done = 0usize;
+        while done < left {
+            $engine.walk();
+            done += 1;
+            if ($engine.anchor, $engine.going_forward) == start {
+                left %= done;
+                done = 0;
+            }
+        }
+    }};
+}
+
 /// Internal bounce engine operating in **character-column** space.
 ///
 /// All positions are whole character columns, so there are never any
@@ -1239,6 +1260,9 @@ impl<'a> BarSpinner<'a> {
     fn build_lines(&self, actual_width: usize, actual_height: usize) -> Vec<Line<'static>> {
         #[allow(clippy::cast_possible_truncation)]
         let steps = (self.tick / self.ticks_per_step) as usize;
+        // Clamp dimensions so absurd values cannot exhaust memory.
+        let actual_width = actual_width.min(MAX_DIM);
+        let actual_height = actual_height.min(MAX_DIM);
 
         match self.orientation {
             BarOrientation::Horizontal => {
@@ -1248,15 +1272,14 @@ impl<'a> BarSpinner<'a> {
                     self.thickness
                 } else {
                     self.height
-                };
+                }
+                .min(MAX_DIM);
                 // Disable fade for multi-row bars: the graduated braille dots
                 // create ugly stepped/diagonal edges when stacked vertically.
                 // Single-row bars keep the smooth gradient.
                 let fade = if h > 1 { 0 } else { self.fade_width };
                 let mut engine = RectEngine::build(w, h, self.arc_width, self.spin, self.motion);
-                for _ in 0..steps {
-                    engine.walk();
-                }
+                walk_periodic!(engine, steps);
                 engine.render_lines(
                     self.arc_color,
                     self.dim_color,
@@ -1277,13 +1300,11 @@ impl<'a> BarSpinner<'a> {
                 } else {
                     self.width
                 }
-                .max(1);
+                .clamp(1, MAX_DIM);
                 let char_h = actual_height.max(3);
                 let mut engine =
                     VertRectEngine::build(char_w, char_h, self.arc_width, self.spin, self.motion);
-                for _ in 0..steps {
-                    engine.walk();
-                }
+                walk_periodic!(engine, steps);
                 engine.render_lines(
                     self.arc_color,
                     self.dim_color,
