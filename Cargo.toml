@@ -29,7 +29,7 @@ ratatui = { version = "0.30", default-features = false }
 tui-nuances = { version = "0.1.7", optional = true }
 
 [features]
-default = []
+default = ["theme"]
 # Opt-in shared theming via tui-nuances (`.theme(&Theme)` builders).
 theme = ["dep:tui-nuances"]
 
