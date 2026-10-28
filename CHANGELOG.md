@@ -2,12 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.5.1 - 2026-10-28
+### ✨ Features
+- feat: enable the tui-nuances theme feature by default
+### 🔄 CI
+- ci: automerge green PRs (workflow_run) + dependabot for actions
+- ci: automerge major dependabot bumps too
+- ci(gitea): nightly workflow-action bumps
+- ci(deps): bump softprops/action-gh-release from 2 to 3 (#3)
+- ci(deps): bump actions/checkout from 6 to 7 (#4)
+### 🔧 Chores
+- chore(justfile): skip unconfigured remotes in *-all recipes
+- chore(justfile): push/pull current branch instead of hardcoded main
+- chore: bump tui-nuances to 0.1.7
+- chore(deps): bump tui-nuances to 0.1.10
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.5.0...v0.5.1
 ## 0.5.0 - 2026-10-14
 ### ✨ Features
 - feat: shared theming via tui-nuances
 - feat: make theming an optional "theme" feature
 ### 🐛 Bug Fixes
-- fix(ci): gate deps-update has_changes on Cargo.lock only
 - fix(scripts): drop deprecated str downcase; exit non-zero when bump is aborted
 - fix: bound sizes and tick walks so huge values cannot hang or exhaust memory
 ### 📚 Documentation
@@ -17,23 +31,68 @@ All notable changes to this project will be documented in this file.
 - ci(security): add cargo-audit workflow and just audit recipe
 - ci: prebuilt Nushell, cargo-deny + cargo-audit security workflow; add cargo-fuzz; tui-nuances 0.1.6
 ### 🔧 Chores
-- chore: bump version to 0.4.21
-- chore: bump version to 0.4.22
-- chore: bump version to 0.4.23
-- chore: bump version to 0.4.24
-- chore: bump version to 0.4.25
-- chore: bump version to 0.4.26
-- chore: bump version to 0.4.27
-- chore: bump version to 0.4.28
-- chore: bump version to 0.4.29
-- chore: bump version to 0.4.30
-- chore: bump version to 0.4.31
-- chore: bump version to 0.4.32
-- chore: bump version to 0.4.33
-- chore: bump version to 0.4.34
 - chore(just): add force-push recipes (per-remote, tags, push-all-force-with-tags)
 - chore: depend on tui-nuances 0.1.6 from crates.io
-**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.20...v0.5.0
+- chore: bump version to 0.5.0
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.34...v0.5.0
+## 0.4.34 - 2026-10-10
+### 🔧 Chores
+- chore: bump version to 0.4.34
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.33...v0.4.34
+## 0.4.33 - 2026-10-09
+### 🔧 Chores
+- chore: bump version to 0.4.33
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.32...v0.4.33
+## 0.4.32 - 2026-10-07
+### 🔧 Chores
+- chore: bump version to 0.4.32
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.31...v0.4.32
+## 0.4.31 - 2026-10-06
+### 🔧 Chores
+- chore: bump version to 0.4.31
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.30...v0.4.31
+## 0.4.30 - 2026-10-04
+### 🔧 Chores
+- chore: bump version to 0.4.30
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.29...v0.4.30
+## 0.4.29 - 2026-10-03
+### 🔧 Chores
+- chore: bump version to 0.4.29
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.28...v0.4.29
+## 0.4.28 - 2026-10-01
+### 🔧 Chores
+- chore: bump version to 0.4.28
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.27...v0.4.28
+## 0.4.27 - 2026-09-26
+### 🔧 Chores
+- chore: bump version to 0.4.27
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.26...v0.4.27
+## 0.4.26 - 2026-09-25
+### 🔧 Chores
+- chore: bump version to 0.4.26
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.25...v0.4.26
+## 0.4.25 - 2026-09-24
+### 🔧 Chores
+- chore: bump version to 0.4.25
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.24...v0.4.25
+## 0.4.24 - 2026-09-23
+### 🔧 Chores
+- chore: bump version to 0.4.24
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.23...v0.4.24
+## 0.4.23 - 2026-09-22
+### 🔧 Chores
+- chore: bump version to 0.4.23
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.22...v0.4.23
+## 0.4.22 - 2026-09-19
+### 🔧 Chores
+- chore: bump version to 0.4.22
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.21...v0.4.22
+## 0.4.21 - 2026-09-17
+### 🐛 Bug Fixes
+- fix(ci): gate deps-update has_changes on Cargo.lock only
+### 🔧 Chores
+- chore: bump version to 0.4.21
+**Full Changelog**: https://github.com/sorinirimies/tui-spinner/compare/v0.4.20...v0.4.21
 ## 0.4.20 - 2026-09-12
 ### 🔧 Chores
 - chore: bump version to 0.4.20
