@@ -4,6 +4,8 @@
 [![Docs.rs](https://img.shields.io/docsrs/tui-spinner?style=flat-square&logo=docsdotrs&label=docs.rs)](https://docs.rs/tui-spinner)
 [![tui-spinner installs](https://img.shields.io/crates/d/tui-spinner?label=tui-spinner%20installs&logo=rust&color=orange)](https://crates.io/crates/tui-spinner)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Audit](https://github.com/sorinirimies/tui-spinner/actions/workflows/security.yml/badge.svg)](https://github.com/sorinirimies/tui-spinner/actions/workflows/security.yml)
+[![Fuzz](https://github.com/sorinirimies/tui-spinner/actions/workflows/fuzz.yml/badge.svg)](https://github.com/sorinirimies/tui-spinner/actions/workflows/fuzz.yml)
 
 Customizable spinner widgets for [Ratatui](https://github.com/ratatui/ratatui) TUI applications.
 
