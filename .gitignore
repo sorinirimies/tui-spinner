@@ -129,3 +129,4 @@ fuzz/target/
 fuzz/artifacts/
 fuzz/corpus/*
 fuzz/Cargo.lock
+.codegraph/
