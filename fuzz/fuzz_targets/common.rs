@@ -1,5 +1,4 @@
 //! Shared helpers: bounded arbitrary sizes and rendering into a Buffer.
-#![allow(dead_code)]
 
 use arbitrary::Arbitrary;
 use ratatui::{
