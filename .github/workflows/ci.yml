@@ -3,133 +3,57 @@ name: CI
 on:
   pull_request:
   push:
-    branches:
-      - main
-      - master
-      - develop
+    branches: [main, master, develop]
 
 env:
   CARGO_TERM_COLOR: always
 
-# Cancel in-progress runs on the same branch/PR so we never queue up stale
-# jobs after a force-push.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ── 1. Formatting ────────────────────────────────────────────────────────────
-  fmt:
-    name: fmt
+  # fmt + clippy + tests + versions + nu tests —
+  # the same script `just check-all` runs.
+  gate:
+    name: quality gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install Rust stable + rustfmt
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check formatting
-        run: cargo fmt --check
-
-  # ── 2. Clippy ────────────────────────────────────────────────────────────────
-  clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust stable + clippy
-        uses: dtolnay/rust-toolchain@stable
+          components: rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: hustcer/setup-nu@v3
         with:
-          components: clippy
+          version: "0.116.1"
+      - name: Quality gate
+        run: nu scripts/ci/quality_gate.nu
 
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Run clippy
-        run: cargo clippy --all-features -- -D warnings
-
-      - name: Run clippy (default features)
-        run: cargo clippy -- -D warnings
-
-      - name: Check (no default features)
-        run: cargo check --no-default-features
-
-  # ── 3. Tests ─────────────────────────────────────────────────────────────────
+  # Users build on all three systems: paths and line endings differ there.
   test:
-    name: test
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test --workspace
+        run: cargo test --workspace --all-features
+
+
+  msrv:
+    name: MSRV (1.88)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Run tests (default features)
-        run: cargo test
-
-      - name: Run tests
-        run: cargo test --all-features
-
-  # ── 4. Build ─────────────────────────────────────────────────────────────────
-  build:
-    name: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build
-        run: cargo build
-
-  # ── 5. Documentation (nightly, docsrs cfg) ──────────────────────────────────
-  doc:
-    name: doc
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build docs
-        run: cargo doc --no-deps --all-features
-        env:
-          RUSTDOCFLAGS: --cfg docsrs -D warnings
-
-  # ── 6. Nushell integration tests ────────────────────────────────────────────
-  test-nu:
-    name: test-nu
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install Nushell
-        uses: hustcer/setup-nu@v3
+      # @master + toolchain, not @1.88: Dependabot would bump a version ref.
+      - uses: dtolnay/rust-toolchain@master
         with:
-          version: "0.111.0"
-
-      - name: Run Nu script tests
-        run: nu scripts/tests/run_all.nu
+          toolchain: "1.88"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --locked

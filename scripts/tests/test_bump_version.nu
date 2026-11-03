@@ -1,135 +1,83 @@
 #!/usr/bin/env nu
-# test_bump_version.nu — Tests for scripts/bump_version.nu
-# Tests version format validation and Cargo.toml version reading/updating.
-# Adapted for a single crate (no workspace).
-# Usage: nu scripts/tests/test_bump_version.nu
+# ── tui-spinner · test_bump_version.nu ─────────────────────────────────
+# Tests for the pure helpers of scripts/bump_version.nu.
 
-use runner.nu [run_tests, assert_true, assert_false, assert_eq, assert_str_contains]
+use std/assert
+use runner.nu *
+use ../bump_version.nu [is_semver compare_versions set_workspace_version set_extension_version]
 
-def main [] {
-    let reset = (ansi reset)
-    let cyan = (ansi cyan)
-    let green = (ansi green)
-    let red = (ansi red)
+const CARGO = '[package]
+name = "tui-spinner"
+version.workspace = true
 
-    print $"($cyan)── test_bump_version.nu ───────────────────────($reset)"
+[workspace.package]
+version      = "0.1.0"
+edition      = "2021"
 
-    let results = run_tests [
-        {
-            name: "test valid semver X.Y.Z is accepted",
-            fn: {||
-                let versions = ["0.1.0", "1.0.0", "12.34.56", "0.0.1", "999.999.999"]
-                for v in $versions {
-                    let matched = ($v | parse --regex '^(\d+)\.(\d+)\.(\d+)(-[\w.]+)?$' | length) > 0
-                    assert_true $matched --msg $"version '($v)' should be valid semver"
-                }
-            }
-        },
-        {
-            name: "test valid semver X.Y.Z-suffix is accepted",
-            fn: {||
-                let versions = ["0.1.0-alpha", "1.0.0-beta.1", "2.3.4-rc.2", "0.1.0-pre.release.3"]
-                for v in $versions {
-                    let matched = ($v | parse --regex '^(\d+)\.(\d+)\.(\d+)(-[\w.]+)?$' | length) > 0
-                    assert_true $matched --msg $"version '($v)' should be valid semver with suffix"
-                }
-            }
-        },
-        {
-            name: "test invalid version formats are rejected",
-            fn: {||
-                let bad_versions = ["1.0", "1", "abc", "1.0.0.0", "v1.0.0", "1.0.0-", ".1.0.0", "1..0.0"]
-                for v in $bad_versions {
-                    let matched = ($v | parse --regex '^(\d+)\.(\d+)\.(\d+)(-[\w.]+)?$' | length) > 0
-                    assert_false $matched --msg $"version '($v)' should be rejected as invalid"
-                }
-            }
-        },
-        {
-            name: "test read current version from Cargo.toml",
-            fn: {||
-                let version = (open Cargo.toml | get package.version)
-                assert_true (($version | str length) > 0) --msg "Cargo.toml should have a non-empty package.version"
-                let matched = ($version | parse --regex '^(\d+)\.(\d+)\.(\d+)(-[\w.]+)?$' | length) > 0
-                assert_true $matched --msg $"Cargo.toml version '($version)' should be valid semver"
-            }
-        },
-        {
-            name: "test version line replacement in Cargo.toml content",
-            fn: {||
-                # Simulate the replacement logic on a sample Cargo.toml snippet
-                let sample = "
-[package]
-name = \"tui-spinner\"
-version = \"0.1.0\"
-edition = \"2021\"
-"
-                let new_version = "0.2.0"
-                let updated = ($sample | str replace --regex 'version\s*=\s*"[^"]+"' $'version = "($new_version)"')
-                assert_str_contains $updated $'version = "0.2.0"' --msg "version line should be updated to 0.2.0"
-                # Ensure other fields are preserved
-                assert_str_contains $updated 'name = "tui-spinner"' --msg "package name should be preserved"
-                assert_str_contains $updated 'edition = "2021"' --msg "edition should be preserved"
-            }
-        },
-        {
-            name: "test version replacement only changes first occurrence",
-            fn: {||
-                # In a single-crate project, only the [package] version matters.
-                # The regex replaces the first match, which is the package version.
-                let sample = "
-[package]
-name = \"tui-spinner\"
-version = \"0.1.0\"
+[workspace.dependencies]
+demo-core    = "=0.3.7"
+serde = { version = "1", features = ["derive"] }
+'
 
-[dependencies]
-ratatui = { version = \"0.30\", default-features = false }
-"
-                let new_version = "0.2.0"
-                let updated = ($sample | str replace --regex 'version\s*=\s*"[^"]+"' $'version = "($new_version)"')
-                # The first version line should be updated
-                assert_str_contains $updated 'version = "0.2.0"' --msg "package version should be updated"
-                # The dependency version should remain untouched
-                assert_str_contains $updated 'version = "0.30"' --msg "dependency version should be preserved"
-            }
-        },
-        {
-            name: "test version with pre-release suffix replacement",
-            fn: {||
-                let sample = "[package]\nversion = \"0.1.0\"\n"
-                let new_version = "0.2.0-alpha.1"
-                let updated = ($sample | str replace --regex 'version\s*=\s*"[^"]+"' $'version = "($new_version)"')
-                assert_str_contains $updated $'version = "0.2.0-alpha.1"' --msg "pre-release version should be set"
-            }
-        },
-        {
-            name: "test bump_version rejects invalid version with error",
-            fn: {||
-                # Run bump_version.nu with an invalid version — it should fail
-                let result = (do { nu scripts/bump_version.nu "not-a-version" --yes } | complete)
-                assert_true ($result.exit_code != 0) --msg "bump_version should exit non-zero for invalid version"
-            }
-        },
-        {
-            name: "test Cargo.toml has package section (not workspace)",
-            fn: {||
-                # Ensure this is a single crate, not a workspace
-                let cargo = (open Cargo.toml)
-                let has_package = ($cargo | get package? | is-not-empty)
-                assert_true $has_package --msg "Cargo.toml should have a [package] section"
+const EXT = 'id = "demo"
+name = "Demo"
+version = "0.1.0"
+schema_version = 1
 
-                # A workspace root Cargo.toml would have [workspace] but no [package]
-                let has_workspace = ($cargo | get workspace? | is-not-empty)
-                assert_false $has_workspace --msg "Cargo.toml should not have a [workspace] section (single crate)"
-            }
-        },
-    ]
+[language_servers.demo]
+name = "Demo"
+'
 
-    # ── summary ──────────────────────────────────────────────────────
-    if $results.failed > 0 {
-        print $"($red)  ($results.failed) test\(s\) failed($reset)"
-        exit 1
-    } else {
-        print $"($green)  all ($results.passed) test\(s\) passed($reset)"
-    }
+def "test bump: semver accepts releases and pre-releases" [] {
+    assert (is_semver "0.1.0")
+    assert (is_semver "12.0.3-rc.1")
+    assert (not (is_semver "v0.1.0"))
+    assert (not (is_semver "0.1"))
+    assert (not (is_semver "0.1.0.4"))
+    assert (not (is_semver ""))
 }
+
+def "test bump: compare orders by major minor patch" [] {
+    assert equal (compare_versions "0.2.0" "0.1.9") 1
+    assert equal (compare_versions "0.1.9" "0.2.0") (-1)
+    assert equal (compare_versions "1.0.0" "1.0.0") 0
+    assert equal (compare_versions "0.10.0" "0.9.0") 1 "numeric, not lexical"
+}
+
+def "test bump: a pre-release sorts below its release" [] {
+    assert equal (compare_versions "1.0.0-rc.1" "1.0.0") (-1)
+    assert equal (compare_versions "1.0.0" "1.0.0-rc.1") 1
+    assert equal (compare_versions "1.0.0-rc.2" "1.0.0-rc.10") (-1)
+    assert equal (compare_versions "1.0.0-alpha" "1.0.0-1") 1
+    assert equal (compare_versions "1.0.0-rc" "1.0.0-rc.1") (-1)
+}
+
+def "test bump: only the workspace.package version changes" [] {
+    let out = (set_workspace_version $CARGO "0.2.0")
+    assert ($out | str contains 'version      = "0.2.0"')
+    assert ($out | str contains 'demo-core    = "=0.3.7"') "dependency pins stay"
+    assert ($out | str contains 'serde = { version = "1"') "dependency versions stay"
+    assert ($out | str contains 'version.workspace = true')
+    assert equal ($out | from toml | get workspace.package.version) "0.2.0"
+}
+
+def "test bump: a single crate at the root bumps its package version" [] {
+    let text = "[package]\nname = \"x\"\nversion = \"0.1.0\"\n\n[dependencies]\nserde = { version = \"1\" }\nfoo = \"0.1.0\"\n"
+    let out = set_workspace_version $text "0.2.0"
+    assert equal ($out | from toml | get package.version) "0.2.0"
+    assert equal ($out | from toml | get dependencies.foo) "0.1.0" "dependency versions stay"
+}
+
+def "test bump: extension version changes once" [] {
+    let out = (set_extension_version $EXT "0.2.0")
+    assert equal ($out | from toml | get version) "0.2.0"
+    assert equal ($out | from toml | get language_servers.demo.name) "Demo"
+    assert equal ($out | lines | where {|l| $l starts-with "version" } | length) 1
+}
+
+def "test bump: setting the same version is a no-op on content" [] {
+    let out = (set_extension_version $EXT "0.1.0")
+    assert equal ($out | from toml) ($EXT | from toml)
+}
+
+def main [] { run-tests }

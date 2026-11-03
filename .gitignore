@@ -130,3 +130,5 @@ fuzz/artifacts/
 fuzz/corpus/*
 fuzz/Cargo.lock
 .codegraph/
+/dist/
+/RELEASE_NOTES.md

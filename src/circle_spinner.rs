@@ -554,6 +554,7 @@ impl Widget for &CircleSpinner<'_> {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(clippy::pedantic, clippy::const_is_empty)]
 mod tests {
     use super::*;
     use crate::rect_spinner::Spin;
@@ -717,12 +718,12 @@ mod tests {
         let mut b0 = Buffer::empty(area);
         let mut b5 = Buffer::empty(area);
         Widget::render(
-            &CircleSpinner::new(0).radius(4).spin(Spin::Clockwise),
+            CircleSpinner::new(0).radius(4).spin(Spin::Clockwise),
             area,
             &mut b0,
         );
         Widget::render(
-            &CircleSpinner::new(5).radius(4).spin(Spin::Clockwise),
+            CircleSpinner::new(5).radius(4).spin(Spin::Clockwise),
             area,
             &mut b5,
         );
@@ -736,12 +737,12 @@ mod tests {
         let mut b0 = Buffer::empty(area);
         let mut b1 = Buffer::empty(area);
         Widget::render(
-            &CircleSpinner::new(0).radius(4).ticks_per_step(3),
+            CircleSpinner::new(0).radius(4).ticks_per_step(3),
             area,
             &mut b0,
         );
         Widget::render(
-            &CircleSpinner::new(1).radius(4).ticks_per_step(3),
+            CircleSpinner::new(1).radius(4).ticks_per_step(3),
             area,
             &mut b1,
         );
@@ -754,12 +755,12 @@ mod tests {
         let mut bcw = Buffer::empty(area);
         let mut bccw = Buffer::empty(area);
         Widget::render(
-            &CircleSpinner::new(5).radius(4).spin(Spin::Clockwise),
+            CircleSpinner::new(5).radius(4).spin(Spin::Clockwise),
             area,
             &mut bcw,
         );
         Widget::render(
-            &CircleSpinner::new(5).radius(4).spin(Spin::CounterClockwise),
+            CircleSpinner::new(5).radius(4).spin(Spin::CounterClockwise),
             area,
             &mut bccw,
         );

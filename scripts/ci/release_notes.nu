@@ -1,61 +1,41 @@
 #!/usr/bin/env nu
 # ──────────────────────────────────────────────────────────────────────────────
-#  tui-spinner – CI Release Notes Generator
+# tui-spinner — Release notes
 # ──────────────────────────────────────────────────────────────────────────────
-#  Called by the release workflow AFTER the tag has been pushed.
-#  The version is already bumped in Cargo.toml — this script
-#  only generates CHANGELOG.md and RELEASE_NOTES.md.
+# Writes RELEASE_NOTES.md for a tag: install instructions plus this release's
+# section of the changelog (git-cliff --latest; the workflow runs at the tag, so
+# --unreleased would be empty).
 #
-#  Usage:
-#    nu scripts/ci/release_notes.nu v0.2.0
+# Usage:
+#   nu scripts/ci/release_notes.nu v0.2.0
 # ──────────────────────────────────────────────────────────────────────────────
+
+# The notes text for `version` with the changelog section `changes`.
+export def notes [version: string, changes: string]: nothing -> string {
+    [
+        $"# tui-spinner ($version)"
+        ""
+        $"Add it from crates.io \(docs: https://docs.rs/tui-spinner/($version)\):"
+        ""
+        "```sh"
+        "cargo add tui-spinner"
+        "```"
+        ""
+        "## Changes"
+        ""
+        $changes
+        ""
+    ] | str join "\n"
+}
 
 def main [raw_tag: string] {
     let version = ($raw_tag | str replace --regex '^v' '')
-
-    print $"Generating release artifacts for v($version)…"
-
-    # ── Generate CHANGELOG.md ─────────────────────────────────
-    if (which git-cliff | is-not-empty) {
-        print "  Generating CHANGELOG.md…"
-        try {
-            git-cliff --tag $"v($version)" --output CHANGELOG.md
-            print "  ✔ CHANGELOG.md updated"
-        } catch {
-            print "  ⚠ git-cliff failed — skipping changelog"
-        }
+    let changes = if (which git-cliff | is-not-empty) {
+        let r = (do { ^git-cliff --latest --strip header } | complete)
+        if $r.exit_code == 0 and ($r.stdout | str trim | is-not-empty) { $r.stdout | str trim } else { "- See the commit history." }
     } else {
-        print "  ⚠ git-cliff not found — skipping changelog"
+        "- See the commit history."
     }
-
-    # ── Generate RELEASE_NOTES.md ─────────────────────────────
-    print "  Generating RELEASE_NOTES.md…"
-
-    mut notes = $"# tui-spinner v($version)\n\n"
-    $notes = $notes + "## Installation\n\n"
-    $notes = $notes + "Add `tui-spinner` to your `Cargo.toml`:\n\n"
-    $notes = $notes + "```toml\n"
-    $notes = $notes + "[dependencies]\n"
-    $notes = $notes + $"tui-spinner = \"($version)\"\n"
-    $notes = $notes + "```\n\n"
-    $notes = $notes + "Or install via cargo:\n\n"
-    $notes = $notes + "```sh\n"
-    $notes = $notes + $"cargo add tui-spinner@($version)\n"
-    $notes = $notes + "```\n\n"
-
-    # Append changelog for this version
-    if (which git-cliff | is-not-empty) {
-        try {
-            let cliff_notes = (git-cliff --tag $"v($version)" --unreleased --strip header | str trim)
-            if ($cliff_notes | is-not-empty) {
-                $notes = $notes + "## What's Changed\n\n"
-                $notes = $notes + $cliff_notes
-                $notes = $notes + "\n"
-            }
-        }
-    }
-
-    $notes | save --force RELEASE_NOTES.md
-    print "  ✔ RELEASE_NOTES.md generated"
-    print $"✅ Release artifacts ready for v($version)"
+    notes $version $changes | save --force RELEASE_NOTES.md
+    print $"(ansi green)✅ RELEASE_NOTES.md for ($version)(ansi reset)"
 }

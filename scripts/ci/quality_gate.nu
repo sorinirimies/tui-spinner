@@ -1,140 +1,61 @@
 #!/usr/bin/env nu
 # ──────────────────────────────────────────────────────────────────────────────
-# tui-spinner — CI Quality Gate
+# tui-spinner — Quality gate
 # ──────────────────────────────────────────────────────────────────────────────
-# Runs the full quality-gate sequence used by both CI and release workflows:
+# The same sequence locally (`just check-all`), in CI, in the nightly dependency
+# update and before a bump:
 #   1. cargo fmt --check
-#   2. cargo clippy (deny warnings)
-#   3. cargo test
-#   4. nu script tests
+#   2. cargo clippy (workspace, all targets, -D warnings)
+#   3. cargo test --workspace
+#   4. cargo doc with warnings as errors (broken intra-doc links fail docs.rs)
+#   5. versions agree (Cargo.toml == EXTRA_MANIFESTS)
+#   6. nushell script tests
+# Project-specific steps (a wasm build, a web bundle, …) go in as extra run_step
+# calls — one place, so every caller gets them.
 #
-# Usage:
-#   nu scripts/ci/quality_gate.nu              # run all four checks
-#   nu scripts/ci/quality_gate.nu --skip-fmt   # skip formatting check
-#   nu scripts/ci/quality_gate.nu --skip-test  # skip test suite
-#   nu scripts/ci/quality_gate.nu --skip-nu    # skip Nushell script tests
-#
-# Exit codes:
-#   0  — all checks passed
-#   1  — one or more checks failed
+# Usage: nu scripts/ci/quality_gate.nu [--skip-fmt] [--skip-test] [--skip-nu]
 # ──────────────────────────────────────────────────────────────────────────────
 
-def green [msg: string] { $"(ansi green)($msg)(ansi reset)" }
-def red   [msg: string] { $"(ansi red)($msg)(ansi reset)" }
-def cyan  [msg: string] { $"(ansi cyan)($msg)(ansi reset)" }
-
-def step [label: string] {
-    print $"(cyan '▶') ($label)"
+def run_step [label: string, cmd: closure]: nothing -> bool {
+    print $"(ansi cyan)▶(ansi reset) ($label)"
+    let r = (do $cmd | complete)
+    if $r.exit_code == 0 {
+        print $"(ansi green)  ✔ ok(ansi reset)"
+        true
+    } else {
+        print $"(ansi red)  ✗ failed(ansi reset)"
+        if ($r.stdout | str trim | is-not-empty) { print $r.stdout }
+        if ($r.stderr | str trim | is-not-empty) { print $r.stderr }
+        false
+    }
 }
 
-def main [
-    --skip-fmt   # Skip the cargo fmt check
-    --skip-test  # Skip the cargo test suite
-    --skip-nu    # Skip the Nushell script tests
-] {
-    print ""
-    print (cyan "══════════════════════════════════════════════════════════")
-    print (cyan "  tui-spinner — Quality Gate")
-    print (cyan "══════════════════════════════════════════════════════════")
-    print ""
-
-    mut failed = false
-
-    # ── 1. Formatting ─────────────────────────────────────────────────────────
+def main [--skip-fmt, --skip-test, --skip-nu] {
+    print $"(ansi cyan)══ tui-spinner — Quality Gate ══(ansi reset)"
+    mut ok = true
     if not $skip_fmt {
-        step "cargo fmt --check"
-        let result = (do { cargo fmt --check } | complete)
-        if $result.exit_code != 0 {
-            print (red "  ✗ Formatting check failed.")
-            if ($result.stderr | str trim | is-not-empty) {
-                print $result.stderr
-            }
-            if ($result.stdout | str trim | is-not-empty) {
-                print $result.stdout
-            }
-            $failed = true
-        } else {
-            print (green "  ✔ Formatting OK")
-        }
-        print ""
-    } else {
-        print "  ⏭ Skipping cargo fmt"
-        print ""
+        $ok = (run_step "cargo fmt --all -- --check" { cargo fmt --all -- --check }) and $ok
     }
-
-    # ── 2. Clippy ─────────────────────────────────────────────────────────────
-    step "cargo clippy --all-features -- -D warnings"
-    let clippy = (do {
-        cargo clippy --all-features -- -D warnings
-    } | complete)
-    if $clippy.exit_code != 0 {
-        print (red "  ✗ Clippy found warnings or errors.")
-        if ($clippy.stderr | str trim | is-not-empty) {
-            print $clippy.stderr
-        }
-        $failed = true
-    } else {
-        print (green "  ✔ Clippy passed")
-    }
-    print ""
-
-    # ── 3. Tests ──────────────────────────────────────────────────────────────
+    $ok = (run_step "cargo clippy --workspace --all-targets -- -D warnings" {
+        cargo clippy --workspace --all-targets --all-features -- -D warnings
+    }) and $ok
+    # Users may turn the default features off: the library alone must still build clean.
+    $ok = (run_step "cargo clippy --lib --no-default-features -- -D warnings" {
+        cargo clippy --lib --no-default-features -- -D warnings
+    }) and $ok
     if not $skip_test {
-        step "cargo test --all-features"
-        let test_result = (do {
-            cargo test --all-features
-        } | complete)
-        if $test_result.exit_code != 0 {
-            print (red "  ✗ Tests failed.")
-            if ($test_result.stderr | str trim | is-not-empty) {
-                print $test_result.stderr
-            }
-            if ($test_result.stdout | str trim | is-not-empty) {
-                print $test_result.stdout
-            }
-            $failed = true
-        } else {
-            print (green "  ✔ All tests passed")
-        }
-        print ""
-    } else {
-        print "  ⏭ Skipping cargo test"
-        print ""
+        $ok = (run_step "cargo test --workspace" { cargo test --workspace --all-features }) and $ok
     }
-
-    # ── 4. Nushell script tests ───────────────────────────────────────────────
+    $ok = (run_step "cargo doc (warnings are errors)" {
+        with-env { RUSTDOCFLAGS: "-D warnings" } { cargo doc --no-deps --all-features --quiet }
+    }) and $ok
+    $ok = (run_step "versions agree" { nu scripts/ci/check_versions.nu }) and $ok
     if not $skip_nu {
-        step "nu scripts/tests/run_all.nu"
-        let nu_result = (do {
-            nu scripts/tests/run_all.nu
-        } | complete)
-        if $nu_result.exit_code != 0 {
-            print (red "  ✗ Nushell script tests failed.")
-            if ($nu_result.stderr | str trim | is-not-empty) {
-                print $nu_result.stderr
-            }
-            if ($nu_result.stdout | str trim | is-not-empty) {
-                print $nu_result.stdout
-            }
-            $failed = true
-        } else {
-            print (green "  ✔ Nushell script tests passed")
-        }
-        print ""
-    } else {
-        print "  ⏭ Skipping Nushell script tests"
-        print ""
+        $ok = (run_step "nushell tests" { nu scripts/tests/run_all.nu }) and $ok
     }
-
-    # ── Summary ───────────────────────────────────────────────────────────────
-    if $failed {
-        print (red "══════════════════════════════════════════════════════════")
-        print (red "  ✗ Quality gate FAILED")
-        print (red "══════════════════════════════════════════════════════════")
+    if not $ok {
+        print $"(ansi red)✗ Quality gate FAILED(ansi reset)"
         exit 1
     }
-
-    print (green "══════════════════════════════════════════════════════════")
-    print (green "  ✔ Quality gate passed")
-    print (green "══════════════════════════════════════════════════════════")
+    print $"(ansi green)✔ Quality gate passed(ansi reset)"
 }

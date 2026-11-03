@@ -105,11 +105,7 @@ fn calc_dimension(size: usize) -> usize {
 }
 
 fn vertical_offset(size: usize) -> isize {
-    if size == 2 {
-        2
-    } else {
-        0
-    }
+    if size == 2 { 2 } else { 0 }
 }
 
 // ── Centre ────────────────────────────────────────────────────────────────────
@@ -637,6 +633,7 @@ impl Widget for &SquareSpinner<'_> {
 }
 
 #[cfg(test)]
+#[allow(clippy::pedantic, clippy::const_is_empty)]
 mod tests {
     use super::*;
 
@@ -675,7 +672,7 @@ mod tests {
     fn widget_renders_without_panic() {
         let area = Rect::new(0, 0, 20, 10);
         let mut buf = Buffer::empty(area);
-        Widget::render(&SquareSpinner::new(0), area, &mut buf);
+        Widget::render(SquareSpinner::new(0), area, &mut buf);
     }
 
     #[test]
@@ -683,9 +680,9 @@ mod tests {
         let area = Rect::new(0, 0, 20, 10);
         let mut b1 = Buffer::empty(area);
         let mut b2 = Buffer::empty(area);
-        Widget::render(&SquareSpinner::new(0).spin(Spin::Clockwise), area, &mut b1);
+        Widget::render(SquareSpinner::new(0).spin(Spin::Clockwise), area, &mut b1);
         Widget::render(
-            &SquareSpinner::new(0).spin(Spin::CounterClockwise),
+            SquareSpinner::new(0).spin(Spin::CounterClockwise),
             area,
             &mut b2,
         );
@@ -697,8 +694,8 @@ mod tests {
         let area = Rect::new(0, 0, 20, 10);
         let mut b0 = Buffer::empty(area);
         let mut b5 = Buffer::empty(area);
-        Widget::render(&SquareSpinner::new(0), area, &mut b0);
-        Widget::render(&SquareSpinner::new(5), area, &mut b5);
+        Widget::render(SquareSpinner::new(0), area, &mut b0);
+        Widget::render(SquareSpinner::new(5), area, &mut b5);
         assert_ne!(b0, b5);
     }
 
@@ -717,7 +714,7 @@ mod tests {
     fn zero_area_no_panic() {
         let area = Rect::new(0, 0, 0, 0);
         let mut buf = Buffer::empty(Rect::new(0, 0, 1, 1));
-        Widget::render(&SquareSpinner::new(0), area, &mut buf);
+        Widget::render(SquareSpinner::new(0), area, &mut buf);
     }
 
     #[test]

@@ -113,11 +113,7 @@ fn calc_dimension(size: usize) -> usize {
 
 /// `vertical_offset` — Go: `if size == 2 { return 2 } return 0`
 fn vertical_offset(size: usize) -> isize {
-    if size == 2 {
-        2
-    } else {
-        0
-    }
+    if size == 2 { 2 } else { 0 }
 }
 
 // ── Centre ────────────────────────────────────────────────────────────────────
@@ -558,6 +554,7 @@ impl Widget for &RectSpinner<'_> {
 }
 
 #[cfg(test)]
+#[allow(clippy::pedantic, clippy::const_is_empty)]
 mod tests {
     use super::*;
 
@@ -598,7 +595,7 @@ mod tests {
     fn widget_renders() {
         let area = Rect::new(0, 0, 20, 10);
         let mut buf = Buffer::empty(area);
-        Widget::render(&RectSpinner::new(0), area, &mut buf);
+        Widget::render(RectSpinner::new(0), area, &mut buf);
     }
 
     #[test]
@@ -607,9 +604,9 @@ mod tests {
         let mut b1 = Buffer::empty(area);
         let mut b2 = Buffer::empty(area);
 
-        Widget::render(&RectSpinner::new(0).spin(Spin::Clockwise), area, &mut b1);
+        Widget::render(RectSpinner::new(0).spin(Spin::Clockwise), area, &mut b1);
         Widget::render(
-            &RectSpinner::new(0).spin(Spin::CounterClockwise),
+            RectSpinner::new(0).spin(Spin::CounterClockwise),
             area,
             &mut b2,
         );
@@ -622,8 +619,8 @@ mod tests {
         let area = Rect::new(0, 0, 20, 10);
         let mut b0 = Buffer::empty(area);
         let mut b5 = Buffer::empty(area);
-        Widget::render(&RectSpinner::new(0), area, &mut b0);
-        Widget::render(&RectSpinner::new(5), area, &mut b5);
+        Widget::render(RectSpinner::new(0), area, &mut b0);
+        Widget::render(RectSpinner::new(5), area, &mut b5);
         assert_ne!(b0, b5);
     }
 

@@ -2,16 +2,18 @@
 name = "tui-spinner"
 version = "0.5.1"
 authors = ["Sorin Albu-Irimies <sorinirimies@gmail.com>"]
-edition = "2021"
-rust-version = "1.74.0"
+edition = "2024"
+rust-version = "1.88"
 license = "MIT"
 description = "Customizable animated spinner widgets for Ratatui — braille arcs, bouncing bars, rotating glyphs, and symbol styles"
 repository = "https://github.com/sorinirimies/tui-spinner"
+documentation = "https://docs.rs/tui-spinner"
 homepage = "https://github.com/sorinirimies/tui-spinner"
 keywords = ["tui", "terminal", "ratatui", "spinner", "widget"]
 categories = ["command-line-interface", "visualization", "rendering", "gui", "graphics"]
 readme = "README.md"
 exclude = [
+    ".cargo/**",
     ".gitea/",
     ".github/",
     ".gitattributes",
@@ -65,6 +67,19 @@ path = "examples/circle_spinner.rs"
 [[example]]
 name = "linear_spinner"
 path = "examples/linear_spinner.rs"
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+missing_docs = "warn"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
 
 [profile.release]
 opt-level = 3

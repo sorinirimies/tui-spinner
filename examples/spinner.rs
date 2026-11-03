@@ -16,11 +16,11 @@
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
+    DefaultTerminal, Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Padding, Paragraph},
-    DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
 use tui_spinner::{
@@ -106,14 +106,14 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
 
         terminal.draw(|frame| render(frame, app))?;
 
-        if event::poll(Duration::from_millis(16))? {
-            if let Event::Key(key) = event::read()? {
-                #[cfg(feature = "theme")]
-                theme_key(key.code);
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,
-                    _ => {}
-                }
+        if event::poll(Duration::from_millis(16))?
+            && let Event::Key(key) = event::read()?
+        {
+            #[cfg(feature = "theme")]
+            theme_key(key.code);
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => break,
+                _ => {}
             }
         }
     }

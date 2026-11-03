@@ -1363,9 +1363,10 @@ impl Widget for &BarSpinner<'_> {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(clippy::pedantic, clippy::const_is_empty)]
 mod tests {
     use super::*;
-    use ratatui::{backend::TestBackend, Terminal};
+    use ratatui::{Terminal, backend::TestBackend};
 
     // ── Engine: construction ──────────────────────────────────────────────────
 
@@ -1479,9 +1480,9 @@ mod tests {
         let spans = &lines[0].spans;
         let dim_char = char::from_u32(0x2800 + u32::from(DIM_BYTE)).unwrap();
         // Columns before the arc anchor should all be DIM_BYTE.
-        for i in 0..e.anchor {
+        for (i, span) in spans.iter().enumerate().take(e.anchor) {
             assert_eq!(
-                spans[i].content.chars().next(),
+                span.content.chars().next(),
                 Some(dim_char),
                 "column {i} should be dim"
             );

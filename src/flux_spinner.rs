@@ -96,6 +96,7 @@ use crate::Spin;
 /// let line    = FluxSpinner::new(0).frames(FluxFrames::LINE);
 /// let custom  = FluxSpinner::new(0).frames(&['a', 'b', 'c', 'd']);
 /// ```
+#[derive(Debug)]
 pub struct FluxFrames;
 
 /// Upper bound for width/height in cells (guards against huge allocations).
@@ -581,9 +582,10 @@ impl Widget for &FluxSpinner<'_> {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(clippy::pedantic, clippy::const_is_empty)]
 mod tests {
     use super::*;
-    use ratatui::{backend::TestBackend, Terminal};
+    use ratatui::{Terminal, backend::TestBackend};
 
     // ── Frame table ───────────────────────────────────────────────────────────
 

@@ -1,93 +1,86 @@
 #!/usr/bin/env nu
-# run_all.nu — Discover and run all test_*.nu files for tui-spinner.
-# Usage: nu scripts/tests/run_all.nu
+# ── tui-spinner · Run All Nushell Tests ────────────────────────────────────────
 #
-# Discovers every test_*.nu file in the same directory, executes each one,
-# and prints a summary with pass/fail counts.
+# Usage:
+#   nu scripts/tests/run_all.nu          # run every test_*.nu file
+#   nu scripts/tests/run_all.nu --filter version   # only files matching "version"
 
-def main [] {
-    let reset = (ansi reset)
-    let red = (ansi red)
-    let green = (ansi green)
-    let yellow = (ansi yellow)
-    let cyan = (ansi cyan)
+def main [--filter: string = ""] {
+    let green  = (ansi green)
+    let red    = (ansi red)
+    let bold   = (ansi --escape {attr: b})
+    let cyan   = (ansi cyan)
+    let reset  = (ansi reset)
 
-    print $"($cyan)═══════════════════════════════════════════════($reset)"
-    print $"($cyan)  tui-spinner — nushell test suite($reset)"
-    print $"($cyan)═══════════════════════════════════════════════($reset)"
+    print $"($bold)($cyan)── tui-spinner · Nushell Test Suite ──($reset)"
     print ""
 
-    # ── discover test files ──────────────────────────────────────────
-    let test_dir = ($nu.current-exe | path dirname | path join "" | ignore; "scripts/tests")
-    # Resolve relative to the repo root (assume we run from repo root)
-    let pattern = "scripts/tests/test_*.nu"
-    let test_files = (glob $pattern | sort)
+    let test_dir = ($env.CURRENT_FILE | path dirname)
 
-    if ($test_files | length) == 0 {
-        print $"($yellow)  ⚠ no test files found matching ($pattern)($reset)"
-        exit 0
-    }
+    let files = (
+        ls $test_dir
+        | where { |it| ($it.name | path basename) =~ '^test_.*\.nu$' }
+        | get name
+        | sort
+    )
 
-    let total_files = ($test_files | length)
-    print $"($cyan)  found ($total_files) test file\(s\):($reset)"
-    for f in $test_files {
-        print $"    • ($f | path basename)"
-    }
-    print ""
-
-    # ── run each test file ───────────────────────────────────────────
-    mut passed_files = 0
-    mut failed_files = 0
-    mut file_results: list<string> = []
-
-    for test_file in $test_files {
-        let basename = ($test_file | path basename)
-        print $"($cyan)──────────────────────────────────────────────($reset)"
-        print $"($cyan)  ▸ ($basename)($reset)"
-        print $"($cyan)──────────────────────────────────────────────($reset)"
-
-        let result = (do { nu $test_file } | complete)
-
-        # Print the test file's output
-        if ($result.stdout | str trim | str length) > 0 {
-            print $result.stdout
-        }
-        if ($result.stderr | str trim | str length) > 0 {
-            print $result.stderr
-        }
-
-        if $result.exit_code == 0 {
-            print $"($green)  ✓ ($basename) passed($reset)"
-            $passed_files = $passed_files + 1
-            $file_results = ($file_results | append $"($green)✓($reset) ($basename)")
-        } else {
-            print $"($red)  ✗ ($basename) failed \(exit code ($result.exit_code)\)($reset)"
-            $failed_files = $failed_files + 1
-            $file_results = ($file_results | append $"($red)✗($reset) ($basename)")
-        }
-        print ""
-    }
-
-    # ── summary ──────────────────────────────────────────────────────
-    print $"($cyan)═══════════════════════════════════════════════($reset)"
-    print $"($cyan)  tui-spinner test summary($reset)"
-    print $"($cyan)═══════════════════════════════════════════════($reset)"
-    print ""
-    for r in $file_results {
-        print $"  ($r)"
-    }
-    print ""
-    print $"  ($green)passed:($reset) ($passed_files)"
-    print $"  ($red)failed:($reset) ($failed_files)"
-    print $"  total:  ($total_files)"
-    print ""
-
-    if $failed_files == 0 {
-        print $"($green)🎉 all tests passed!($reset)"
-        print ""
+    let files = if $filter == "" {
+        $files
     } else {
-        print $"($red)⛔ ($failed_files) test file\(s\) failed.($reset)"
-        print ""
+        $files | where { |f| ($f | path basename) =~ $filter }
+    }
+
+    let total = ($files | length)
+
+    if $total == 0 {
+        print $"($red)No test files found.(ansi reset)"
         exit 1
     }
+
+    print $"Found ($total) test file\(s\):"
+    for f in $files {
+        print $"  ($cyan)($f | path basename)($reset)"
+    }
+    print ""
+
+    mut passed = 0
+    mut failed = 0
+    mut failures = []
+
+    for f in $files {
+        let name = ($f | path basename)
+        print $"($bold)▶ ($name)($reset)"
+        let res = (do { nu $f } | complete)
+
+        # Forward the test file's stdout so the user sees per-test results.
+        if ($res.stdout | str trim) != "" {
+            print $res.stdout
+        }
+
+        if $res.exit_code == 0 {
+            $passed = $passed + 1
+        } else {
+            $failed = $failed + 1
+            $failures = ($failures | append $name)
+            if ($res.stderr | str trim) != "" {
+                print $res.stderr
+            }
+        }
+        print ""
+    }
+
+    print $"($bold)── Summary ──($reset)"
+    print $"  ($green)($passed) passed($reset) · ($red)($failed) failed($reset) · ($total) total"
+
+    if $failed > 0 {
+        print ""
+        print $"($red)($bold)Failed files:($reset)"
+        for f in $failures {
+            print $"  ($red)✗($reset) ($f)"
+        }
+        exit 1
+    }
+
+    print ""
+    print $"($green)($bold)✓ All ($total) test files passed!($reset)"
 }

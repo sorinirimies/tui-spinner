@@ -13,7 +13,7 @@ fn circle_huge_radius_no_overflow() {
     let s = CircleSpinner::new(3).radius(usize::MAX);
     let _ = s.char_size();
     draw(&s);
-    draw(&CircleSpinner::new(u64::MAX).radius(4));
+    draw(CircleSpinner::new(u64::MAX).radius(4));
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn flux_huge_dimensions_no_capacity_overflow() {
 
 #[test]
 fn square_huge_tick_is_fast_and_periodic() {
-    draw(&SquareSpinner::new(u64::MAX));
+    draw(SquareSpinner::new(u64::MAX));
     // Reducing by the period must not change the frame.
     let a = SquareSpinner::new(5).to_lines();
     let b = SquareSpinner::new(5 + 1_000_000).to_lines();
@@ -50,15 +50,15 @@ fn bar_huge_tick_and_width_are_bounded() {
         BarMotion::Squeeze,
         BarMotion::Radiate,
     ] {
-        draw(&BarSpinner::new(u64::MAX).motion(m));
+        draw(BarSpinner::new(u64::MAX).motion(m));
         draw(
-            &BarSpinner::new(u64::MAX)
+            BarSpinner::new(u64::MAX)
                 .motion(m)
                 .orientation(BarOrientation::Vertical),
         );
     }
     draw(
-        &BarSpinner::new(1)
+        BarSpinner::new(1)
             .width(usize::MAX)
             .height(usize::MAX)
             .thickness(usize::MAX),
@@ -67,15 +67,15 @@ fn bar_huge_tick_and_width_are_bounded() {
 
 #[test]
 fn rect_huge_tick_is_fast() {
-    draw(&RectSpinner::new(u64::MAX));
-    draw(&RectSpinner::new(u64::MAX).shape(RectShape::Square(usize::MAX)));
+    draw(RectSpinner::new(u64::MAX));
+    draw(RectSpinner::new(u64::MAX).shape(RectShape::Square(usize::MAX)));
 }
 
 #[test]
 fn linear_huge_slots_no_capacity_overflow() {
     for d in [Direction::Horizontal, Direction::Vertical] {
         draw(
-            &LinearSpinner::new(7)
+            LinearSpinner::new(7)
                 .direction(d)
                 .total_slots(usize::MAX)
                 .lit_slots(usize::MAX),

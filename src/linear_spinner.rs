@@ -607,7 +607,7 @@ impl Widget for &LinearSpinner<'_> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::needless_range_loop)]
+    #![allow(clippy::needless_range_loop, clippy::pedantic, clippy::const_is_empty)]
     use super::*;
 
     // ── Horizontal ────────────────────────────────────────────────────────────

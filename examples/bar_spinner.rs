@@ -13,11 +13,11 @@
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
+    DefaultTerminal, Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Paragraph},
-    DefaultTerminal, Frame,
 };
 use std::time::{Duration, Instant};
 use tui_spinner::{BarMotion, BarOrientation, BarSpinner, BarStyle, Spin};
@@ -78,20 +78,20 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> Result<()> {
         app.last_tick = Instant::now();
         app.tick = app.tick.wrapping_add(steps);
         terminal.draw(|f| render(f, app))?;
-        if event::poll(Duration::from_millis(16))? {
-            if let Event::Key(k) = event::read()? {
-                #[cfg(feature = "theme")]
-                theme_key(k.code);
-                match k.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,
-                    KeyCode::Left | KeyCode::Char('h') => {
-                        app.page = app.page.saturating_sub(1);
-                    }
-                    KeyCode::Right | KeyCode::Char('l') => {
-                        app.page = (app.page + 1).min(NUM_PAGES - 1);
-                    }
-                    _ => {}
+        if event::poll(Duration::from_millis(16))?
+            && let Event::Key(k) = event::read()?
+        {
+            #[cfg(feature = "theme")]
+            theme_key(k.code);
+            match k.code {
+                KeyCode::Char('q') | KeyCode::Esc => break,
+                KeyCode::Left | KeyCode::Char('h') => {
+                    app.page = app.page.saturating_sub(1);
                 }
+                KeyCode::Right | KeyCode::Char('l') => {
+                    app.page = (app.page + 1).min(NUM_PAGES - 1);
+                }
+                _ => {}
             }
         }
     }
