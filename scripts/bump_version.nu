@@ -100,6 +100,12 @@ use version.nu [cargo_version]
 
 const TOUCHED = ["Cargo.toml" "Cargo.lock" "fuzz/Cargo.lock" "CHANGELOG.md"]
 
+# The files to commit: those that exist and that git does not ignore (`git add`
+# refuses an ignored file; some repos ignore fuzz/Cargo.lock).
+export def stageable [files: list<string>, ignored: list<string>]: nothing -> list<string> {
+    $files | where {|f| ($f | path exists) and $f not-in $ignored }
+}
+
 def run_checks [] {
     print $"(ansi cyan)── quality gate: nothing is bumped until it is green ──(ansi reset)"
     nu scripts/ci/quality_gate.nu
@@ -187,7 +193,7 @@ def main [
             print $"(ansi yellow)⚠(ansi reset) git-cliff not found — CHANGELOG.md unchanged."
         }
 
-        ^git add ...($TOUCHED | where {|f| $f | path exists }) ...$EXTRA_MANIFESTS
+        ^git add ...(stageable $TOUCHED (^git check-ignore ...$TOUCHED | complete | get stdout | lines)) ...$EXTRA_MANIFESTS
         ^git commit -m $"chore: bump version to ($new_version)"
         ^git tag -a $tag -m $"Release ($tag)"
         print $"(ansi green)✓(ansi reset) Committed and tagged ($tag)."

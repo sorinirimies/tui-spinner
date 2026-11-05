@@ -4,7 +4,7 @@
 
 use std/assert
 use runner.nu *
-use ../bump_version.nu [is_semver compare_versions set_workspace_version set_extension_version]
+use ../bump_version.nu [is_semver compare_versions set_workspace_version set_extension_version stageable]
 
 const CARGO = '[package]
 name = "tui-spinner"
@@ -78,6 +78,10 @@ def "test bump: extension version changes once" [] {
 def "test bump: setting the same version is a no-op on content" [] {
     let out = (set_extension_version $EXT "0.1.0")
     assert equal ($out | from toml) ($EXT | from toml)
+}
+
+def "test bump: an ignored lockfile is not staged" [] {
+    assert equal (stageable ["scripts" "no/such/file" "Cargo.lock"] ["Cargo.lock"]) ["scripts"]
 }
 
 def main [] { run-tests }
