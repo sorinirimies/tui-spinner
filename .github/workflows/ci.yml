@@ -34,6 +34,10 @@ jobs:
   test:
     name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # macOS arm64 hosted runners are often capacity-starved: don't hang or
+    # fail the run on that. macos-check below still covers the target.
+    timeout-minutes: 20
+    continue-on-error: ${{ matrix.os == 'macos-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +49,26 @@ jobs:
       - name: cargo test --workspace
         run: cargo test --workspace --all-features
 
+  # No macOS runner needed: type-check + clippy against the Apple targets from
+  # Linux. Catches cfg(target_os) / API breakage, not runtime behaviour.
+  macos-check:
+    name: macOS (cross-check ${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: cargo clippy (${{ matrix.target }})
+        run: cargo clippy --workspace --all-features --all-targets --target ${{ matrix.target }} --locked -- -D warnings
 
   msrv:
     name: MSRV (1.88)
